@@ -1,0 +1,6 @@
+*.user
+*.suo
+
+/AutoSendPic/obj
+
+/AutoSendPic/bin
