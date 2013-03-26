@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.IO;
@@ -11,29 +12,28 @@ namespace AutoSendPic.Model
 {
     public class DataManager:IDisposable
     {
-        protected object lockPicDataQueue = new object();
-
-        private CancellationTokenSource tokenSource;
-
-        /// <summary>
-        ///     保存待ちキュー
-        /// </summary>
-        public Queue<PicData> PicDataQueue { get; private set; }
-
-        /// <summary>
-        ///     保存先のストレージ
-        /// </summary>
-        public List<PicStorage> PicStorages { get; set; }
-
         protected object lockPicStorages = new object();
+
+        private Thread thread;
+
+        /// <summary>
+        ///     保存待ちキュー (スレッドセーフ）
+        /// </summary>
+        public ConcurrentQueue<PicData> PicDataQueue { get; private set; }
+
+        /// <summary>
+        ///     保存先のストレージ 
+        /// </summary>
+        public List<PicStorage> PicStorages { get; private set; }
+
 
         /// <summary>
         ///     コンストラクタ
         /// </summary>
         public DataManager()
         {
-            PicDataQueue = new Queue<PicData>();
-            PicStorages = new List<PicStorage>();
+            PicDataQueue = new ConcurrentQueue<PicData>(); //スレッドセーフ
+            PicStorages = new List<PicStorage>(); //非スレッドセーフ
         }
 
         /// <summary>
@@ -52,51 +52,59 @@ namespace AutoSendPic.Model
                 }
                 catch (Exception ex)
                 {
-                    OnError(ex);
+                    if (ex is ThreadAbortException)
+                    {
+                        throw;
+                    }
+                    else
+                    {
+                        OnError(ex);
+                    }
                 }
             }
 
             return true;
         }
-
-        public async void Start()
+		/// <summary>
+		/// 	非同期アップロードを開始する
+		/// </summary>
+        public void Start()
         {
 
-            tokenSource = null;
-            tokenSource = new CancellationTokenSource();
+            if (thread != null && thread.ThreadState == ThreadState.Running)
+            {
+                return; 
+            }
 
-            CancellationToken token = tokenSource.Token;
-
-            await Task.Run(() =>
+            thread = new Thread(() =>
             {
                 for (; ; )
                 {
-                    token.ThrowIfCancellationRequested();
                     Thread.Sleep(100);
                     
                     //１件処理する
                     PicData pd;
-                    lock (lockPicDataQueue)
+                    if (PicDataQueue.TryDequeue(out pd))
                     {
-                        pd = PicDataQueue.Dequeue();
+                        Save(pd);
                     }
-
-                    if (pd == null)
-                    {
-                        continue;
-                    }
-
-                    Save(pd);
-
+                    
                 }
+
             });
+            thread.Start();
+
         }
 
         public void Stop()
         {
-            if (tokenSource != null)
+            if (thread != null)
             {
-                tokenSource.Cancel();
+                try
+                {
+                    thread.Abort();
+                }
+                catch { }
             }
         }
 
@@ -105,11 +113,11 @@ namespace AutoSendPic.Model
         {
             if (Error != null)
             {
-                Error(this, ex);   
+                Error(this, new ExceptionEventArgs( ex));   
             }
         }
 
-        public event EventHandler<Exception> Error;
+        public event EventHandler<ExceptionEventArgs> Error;
 
 
         #region IDisposable メンバー

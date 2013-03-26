@@ -49,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Model\DataManager.cs" />
+    <Compile Include="Model\ExceptionEventArgs.cs" />
     <Compile Include="Model\PicData.cs" />
     <Compile Include="Model\PicStorage.cs" />
     <Compile Include="Model\LocalFilePicStorage.cs" />

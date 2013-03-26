@@ -19,7 +19,6 @@ namespace AutoSendPic.Model
 
         public abstract bool Save(PicData dataToSave);
 
-        event EventHandler<Exception> Error;
 
         public string MakeFileName()
         {

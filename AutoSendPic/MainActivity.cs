@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Linq;
 
 using Android.App;
 using Android.Content;
@@ -12,6 +13,7 @@ using Android.Widget;
 using Android.OS;
 using Android.Hardware;
 using Android.OS.Storage;
+using AutoSendPic.Model;
 
 
 namespace AutoSendPic
@@ -23,7 +25,7 @@ namespace AutoSendPic
         DateTime lastSendStartTime = DateTime.MinValue;
         bool enableSend = false;
         private Camera camera;
-
+        private DataManager dataManager;
 
 
         protected override void OnCreate(Bundle bundle)
@@ -45,13 +47,25 @@ namespace AutoSendPic
             cameraSurfaceView = FindViewById<SurfaceView>(Resource.Id.surfaceView1);
             cameraSurfaceView.Holder.AddCallback(this);
 
-            //ボタン設定
+            // 送信モジュールを初期化
+            dataManager = new DataManager();
+            dataManager.PicStorages.Add(new LocalFilePicStorage(){OutputDir =Android.OS.Environment.ExternalStorageDirectory + "/AutoSendPic/", FileNameFormat="pic_{0:yyyy-MM-dd-HH-mm-ss}.jpg"});
+            dataManager.Error += dataManager_Error;
 
+            //ボタン設定
             Button btnSendStart = FindViewById<Button>(Resource.Id.btnSendStart);
             btnSendStart.Click += delegate
             {
                 enableSend = !enableSend;
                 btnSendStart.Text = enableSend ? "送信停止" : "送信開始";
+                if (enableSend)
+                {
+                    dataManager.Start();
+                }
+                else
+                {
+                    dataManager.Stop();
+                }
             };
 
             Button btnExit = FindViewById<Button>(Resource.Id.btnExit);
@@ -67,6 +81,30 @@ namespace AutoSendPic
                 camera.AutoFocus(null);
             };
 
+        }
+
+        void dataManager_Error(object sender, ExceptionEventArgs e)
+        {
+            try
+            {
+                StringBuilder sb = new StringBuilder();
+                if (e == null || e.Exception == null)
+                {
+                    sb.Append("NULL Error");
+                }
+                else
+                {
+                    sb.AppendFormat(
+                        "{0}: {1}",
+                        e.Exception.GetType().Name,
+                        e.Exception.Message
+                        );
+                }
+
+                Toast toast = Toast.MakeText(BaseContext, sb.ToString(), Android.Widget.ToastLength.Short);
+                toast.Show();
+            }
+            catch { }
         }
 
         public override bool OnCreateOptionsMenu(IMenu menu)
@@ -99,6 +137,17 @@ namespace AutoSendPic
 
         }
 
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+
+            if (dataManager != null)
+            {
+                dataManager.Dispose();
+                dataManager = null;
+            }
+        }
+
 
 
         #region ISurfaceHolderCallback メンバー
@@ -108,6 +157,14 @@ namespace AutoSendPic
 
             try
             {
+                // 縦横が入れ替わっている場合の対処
+                if (width < height)
+                {
+                    var t = width;
+                    width = height;
+                    height = t;
+                }
+
                 // カメラ設定の編集
                 Camera.Parameters parameters = camera.GetParameters();
                 Camera.Size sz = GetOptimalPreviewSize(parameters.SupportedPreviewSizes, width, height); //最適なサイズを取得
@@ -152,43 +209,23 @@ namespace AutoSendPic
             camera.StopPreview();
             camera.Release();
             camera = null;
+
         }
         private Camera.Size GetOptimalPreviewSize(IList<Camera.Size> sizes, int w, int h)
         {
-            const double ASPECT_TOLERANCE = 0.05;
             double targetRatio = (double)w / h;
             if (sizes == null) return null;
 
             Camera.Size optimalSize = null;
-            double minDiff = Double.MaxValue;
 
             int targetHeight = h;
 
-            // Try to find an size match aspect ratio and size
-            foreach (Camera.Size size in sizes)
-            {
-                double ratio = (double)size.Width / size.Height;
-                if (Math.Abs(ratio - targetRatio) > ASPECT_TOLERANCE) continue;
-                if (Math.Abs(size.Height - targetHeight) < minDiff)
-                {
-                    optimalSize = size;
-                    minDiff = Math.Abs(size.Height - targetHeight);
-                }
-            }
 
-            // Cannot find the one match the aspect ratio, ignore the requirement
-            if (optimalSize == null)
-            {
-                minDiff = Double.MaxValue;
-                foreach (Camera.Size size in sizes)
-                {
-                    if (Math.Abs(size.Height - targetHeight) < minDiff)
-                    {
-                        optimalSize = size;
-                        minDiff = Math.Abs(size.Height - targetHeight);
-                    }
-                }
-            }
+            var sorted_sizes = 
+                sizes.OrderBy((x) => Math.Abs((double)x.Width / x.Height - targetRatio))
+                     .ThenBy((x) => Math.Abs(x.Height - targetHeight));
+
+            optimalSize = sorted_sizes.FirstOrDefault(); //一番差が小さいやつ
             return optimalSize;
         }
         #endregion
@@ -199,7 +236,6 @@ namespace AutoSendPic
         {
 
             string tmpfile = "/data/data/" + this.PackageName + "/tmp.jpg";
-
 
             try
             {
@@ -219,8 +255,8 @@ namespace AutoSendPic
                 using (Android.Graphics.YuvImage image = new Android.Graphics.YuvImage(data, parameters.PreviewFormat,
                         size.Width, size.Height, null))
                 {
-                    
-   
+
+
                     //データをJPGに変換してメモリに保持                    
                     using (MemoryStream ms = new MemoryStream())
                     {
@@ -229,16 +265,11 @@ namespace AutoSendPic
                             ms);
 
                         ms.Close();
-                        ms.ToArray();
+                        PicData pd = new PicData(ms.ToArray(), DateTime.Now); // Closeしてからでないと、ToArrayは正常に取得できない
+                        dataManager.PicDataQueue.Enqueue(pd);
                     }
-
                     
-
-                    //サーバーに送信する（TODO: 以下は未実装）
-                    Encoding enc = System.Text.Encoding.GetEncoding("utf-8");
-                    WebClient client = new WebClient();
-                    byte[] bytes = client.UploadFile("http://dev.opap.jp/imgup/up.php", tmpfile);
-
+                    
                 }
 
 

@@ -27,7 +27,7 @@ namespace AutoSendPic.Model
             string filePath = fileDir + MakeFileName();
 
             //保存先がなければ作る
-            if (Directory.Exists(fileDir))
+            if (!Directory.Exists(fileDir))
             {
                 Directory.CreateDirectory(fileDir);
             }
