@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace AutoSendPic.Model
 {
@@ -15,7 +16,7 @@ namespace AutoSendPic.Model
             set;
         }
 
-        public override bool Save(Stream dataToSave)
+        public override bool Save(PicData dataToSave)
         {
             //出力ファイル名の決定
             string fileDir = OutputDir;
@@ -34,19 +35,14 @@ namespace AutoSendPic.Model
             //保存処理
             using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
             {
-                byte[] buf = new byte[4 * 1024];
-                int len = 0;
-                while (0 < (len = dataToSave.Read(buf, 0, buf.Length)))
-                {
-                    fs.Write(buf, 0, len);
-                }
+                fs.Write(dataToSave.Data, 0, dataToSave.Data.Length);
             }
 
             return true;
+
         }
         
 
-        public event EventHandler<Exception> Error;
 
     }
 }

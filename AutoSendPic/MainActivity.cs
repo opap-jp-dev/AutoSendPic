@@ -216,25 +216,30 @@ namespace AutoSendPic
                 //データを読み取り
                 Camera.Parameters parameters = camera.GetParameters();
                 Camera.Size size = parameters.PreviewSize;
-                Android.Graphics.YuvImage image = new Android.Graphics.YuvImage(data, parameters.PreviewFormat,
-                        size.Width, size.Height, null);
-
-
-                //データを一旦一時ファイルに保存する
-                tmpfile = "/data/data/" + this.PackageName + "/tmp.jpg";
-
-                using (FileStream fs = new FileStream(tmpfile, FileMode.Create, FileAccess.Write))
+                using (Android.Graphics.YuvImage image = new Android.Graphics.YuvImage(data, parameters.PreviewFormat,
+                        size.Width, size.Height, null))
                 {
-                    image.CompressToJpeg(
+                    
+   
+                    //データをJPGに変換してメモリに保持                    
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        image.CompressToJpeg(
                             new Android.Graphics.Rect(0, 0, image.Width, image.Height), 90,
-                            fs);
+                            ms);
+
+                        ms.Close();
+                        ms.ToArray();
+                    }
+
+                    
+
+                    //サーバーに送信する（TODO: 以下は未実装）
+                    Encoding enc = System.Text.Encoding.GetEncoding("utf-8");
+                    WebClient client = new WebClient();
+                    byte[] bytes = client.UploadFile("http://dev.opap.jp/imgup/up.php", tmpfile);
+
                 }
-
-                //サーバーに送信する（TODO: 以下は未実装）
-                Encoding enc = System.Text.Encoding.GetEncoding("utf-8");
-                WebClient client = new WebClient();
-                byte[] bytes = client.UploadFile("http://dev.opap.jp/imgup/up.php", tmpfile);
-
 
 
             }
