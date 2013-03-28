@@ -16,6 +16,11 @@
             android:layout_height="fill_parent"
             android:id="@+id/btnFocus" />
         <Button
+            android:text="ライト"
+            android:layout_width="wrap_content"
+            android:layout_height="fill_parent"
+            android:id="@+id/btnToggleFlash" />
+        <Button
             android:text="送信開始"
             android:layout_width="wrap_content"
             android:layout_height="fill_parent"

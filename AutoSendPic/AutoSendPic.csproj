@@ -53,6 +53,7 @@
     <Compile Include="Model\PicData.cs" />
     <Compile Include="Model\PicStorage.cs" />
     <Compile Include="Model\LocalFilePicStorage.cs" />
+    <Compile Include="Settings.cs" />
     <Compile Include="SettingsActivity.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.Designer.cs" />
