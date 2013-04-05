@@ -48,6 +48,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CameraManager.cs" />
     <Compile Include="Model\DataManager.cs" />
     <Compile Include="Model\ExceptionEventArgs.cs" />
     <Compile Include="Model\PicData.cs" />

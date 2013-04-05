@@ -33,9 +33,9 @@ namespace AutoSendPic
             Settings s = new Settings();
             ISharedPreferences p = PreferenceManager.GetDefaultSharedPreferences(con);
 
-			s.MinInterval = p.GetInt ("MinInterval", 1);
-            s.Width = p.GetInt("Width", 1280);
-            s.Height = p.GetInt("Height", 720);
+			s.MinInterval = int.Parse ( p.GetString ("MinInterval", "1"));
+			s.Width = int.Parse ( p.GetString("Width", "1280"));
+			s.Height = int.Parse ( p.GetString("Height", "720"));
             s.OutputDir = p.GetString("OutputDir", Android.OS.Environment.ExternalStorageDirectory + "/AutoSendPic/");
             s.FtpUri = p.GetString("FtpUri", "");
             s.FtpUser = p.GetString("FtpUser", "");
