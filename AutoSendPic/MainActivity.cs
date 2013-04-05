@@ -20,7 +20,7 @@ using AutoSendPic.Model;
 namespace AutoSendPic
 {
     [Activity(Label = "AutoSendPic", MainLauncher = true, Icon = "@drawable/icon")]
-    public class MainActivity : Activity, ISurfaceHolderCallback, Camera.IPictureCallback, Camera.IPreviewCallback
+    public class MainActivity : Activity, ISurfaceHolderCallback
     {
         /// <summary>
         /// カメラのプレビューを表示する所
@@ -32,20 +32,12 @@ namespace AutoSendPic
         /// </summary>
         private volatile bool enableSend = false;
 
-        /// <summary>
-        /// 送信中かどうかを格納するフラグ
-        /// </summary>
-        private volatile bool enableFlash = false;
-
-        /// <summary>
-        /// 現在のフレームを撮影するかどうかの制御フラグ
-        /// </summary>
-        private volatile bool flgReqTakePic = false;
 
         /// <summary>
         /// カメラへの参照
         /// </summary>
-        private Camera camera;
+        //private Camera camera;
+
 
         /// <summary>
         /// 送信用オブジェクト
@@ -113,13 +105,14 @@ namespace AutoSendPic
             SetupEvents();
 
             //カメラを開く
-            lock (cameraSyncObj)
-            {
-                if (camera == null)
-                {
-                    camera = Camera.Open();
-                }
-            }
+            CameraManager.Instance.Open();
+            CameraManager.Instance.PictureTaken += CameraManager_PictureTaken;
+
+        }
+
+        void CameraManager_PictureTaken(object sender, DataEventArgs e)
+        {
+            dataManager.PicDataQueue.Enqueue(e.Data);
         }
 
         public override bool OnCreateOptionsMenu(IMenu menu)
@@ -164,27 +157,12 @@ namespace AutoSendPic
         {
             base.OnPause();
             StopSend();
-
-            lock (cameraSyncObj)
-            {
-                if (camera != null)
-                {
-                    camera.StopPreview();
-                    camera.Release();
-                    camera = null;
-                }
-            }
+            CameraManager.Instance.Close();
         }
         protected override void OnResume()
         {
             base.OnResume();
-            lock (cameraSyncObj)
-            {
-                if (camera == null)
-                {
-                    camera = Camera.Open();
-                }
-            }
+            CameraManager.Instance.Open();
         }
         protected override void OnDestroy()
         {
@@ -192,6 +170,7 @@ namespace AutoSendPic
 
             StopTimer();
             StopDataManager();
+            CameraManager.Instance.Close();
         }
         #endregion
 
@@ -223,10 +202,7 @@ namespace AutoSendPic
             {
                 try
                 {
-                    lock (cameraSyncObj)
-                    {
-                        camera.AutoFocus(null);
-                    }
+                    CameraManager.Instance.AutoFocus();
                 }
                 catch (Exception ex)
                 {
@@ -237,11 +213,8 @@ namespace AutoSendPic
             Button btnToggleFlash = FindViewById<Button>(Resource.Id.btnToggleFlash);
             btnToggleFlash.Click += delegate
             {
-                lock (syncObj)
-                {
-                    enableFlash = !enableFlash;
-                }
-                ApplyCammeraSettings();
+                CameraManager.Instance.EnableFlash = !CameraManager.Instance.EnableFlash;
+                CameraManager.Instance.ApplyFlashStatus();
             };
         }
 
@@ -310,9 +283,9 @@ namespace AutoSendPic
                 lock (syncObj)
                 {
                     //送信が有効かどうかチェック
-                    if (enableSend && camera != null)
+                    if (enableSend)
                     {
-                        flgReqTakePic = true; //次のプレビューフレームを保存する
+                        CameraManager.Instance.RequestTakePicture();
 
                     }
                 }
@@ -408,7 +381,6 @@ namespace AutoSendPic
 
         public void ApplyCammeraSettings()
         {
-            Camera.Size sz, sz2;
 
             if (originalHeight * originalWidth == 0)
             {
@@ -416,39 +388,14 @@ namespace AutoSendPic
             }
 
 
-            Camera.Parameters parameters = camera.GetParameters();
-            sz = GetOptimalSize(parameters.SupportedPreviewSizes, settings.Width, settings.Height); //最適なサイズを取得
-            parameters.SetPreviewSize(sz.Width, sz.Height);
-            sz2 = GetOptimalSize(parameters.SupportedPictureSizes, settings.Width, settings.Height);
-            parameters.SetPictureSize(sz2.Width, sz2.Height);
-            parameters.JpegQuality = 70;
+            CameraManager.Instance.Settings = this.settings;
+            CameraManager.Instance.ApplySettings();
 
 
-            var modes = parameters.SupportedFlashModes;
 
-            if (enableFlash)
-            {
-                if (modes.Contains(Camera.Parameters.FlashModeTorch))
-                {
-                    parameters.FlashMode = Camera.Parameters.FlashModeTorch;
-                }
-                else if (modes.Contains(Camera.Parameters.FlashModeOn))
-                {
-                    parameters.FlashMode = Camera.Parameters.FlashModeOn;
-                }
-            }
-            else
-            {
-                if (modes.Contains(Camera.Parameters.FlashModeOff))
-                {
-                    parameters.FlashMode = Camera.Parameters.FlashModeOff;
-                }
-            }
+            Camera.Size sz = CameraManager.Instance.PictureSize;
 
-            lock (cameraSyncObj)
-            {
-                camera.SetParameters(parameters);
-            }
+
 
             //レイアウト設定の編集
 
@@ -469,36 +416,6 @@ namespace AutoSendPic
 
         }
 
-        public void ApplyFlashStatus()
-        {
-            Camera.Parameters parameters = camera.GetParameters();
-
-            var modes = parameters.SupportedFlashModes;
-
-            if (enableFlash)
-            {
-                if (modes.Contains(Camera.Parameters.FlashModeTorch))
-                {
-                    parameters.FlashMode = Camera.Parameters.FlashModeTorch;
-                }
-                else if (modes.Contains(Camera.Parameters.FlashModeOn))
-                {
-                    parameters.FlashMode = Camera.Parameters.FlashModeOn;
-                }
-            }
-            else
-            {
-                if (modes.Contains(Camera.Parameters.FlashModeOff))
-                {
-                    parameters.FlashMode = Camera.Parameters.FlashModeOff;
-                }
-            }
-
-            lock (cameraSyncObj)
-            {
-                camera.SetParameters(parameters);
-            }
-        }
 
 
         #region ISurfaceHolderCallback メンバー
@@ -524,9 +441,8 @@ namespace AutoSendPic
 
 
                 // 画面プレビュー開始
-                camera.SetPreviewDisplay(cameraSurfaceView.Holder);
-                camera.SetPreviewCallback(this);
-                camera.StartPreview();
+                CameraManager.Instance.SetPreviewDisplay(cameraSurfaceView.Holder);
+                CameraManager.Instance.StartPreview();
 
             }
             catch (System.IO.IOException)
@@ -536,12 +452,9 @@ namespace AutoSendPic
 
         public void SurfaceCreated(ISurfaceHolder holder)
         {
-            lock (cameraSyncObj)
+            if (!CameraManager.Instance.IsOpened)
             {
-                if (camera == null)
-                {
-                    camera = Camera.Open();
-                }
+                CameraManager.Instance.Open();
             }
         }
 
@@ -550,116 +463,8 @@ namespace AutoSendPic
 
         }
 
-        private Camera.Size GetOptimalSize(IList<Camera.Size> sizes, int w, int h)
-        {
-            double targetRatio = (double)w / h;
-            if (sizes == null)
-                return null;
-
-            Camera.Size optimalSize = null;
-
-            int targetHeight = h;
-
-
-            var sorted_sizes =
-                sizes.OrderBy((x) => Math.Abs((double)x.Width / x.Height - targetRatio))
-                     .ThenBy((x) => Math.Abs(x.Height - targetHeight));
-
-            optimalSize = sorted_sizes.FirstOrDefault(); //一番差が小さいやつ
-            return optimalSize;
-        }
         #endregion
 
-
-        #region IPreviewCallback メンバー
-
-        public void OnPreviewFrame(byte[] data, Camera camera)
-        {
-
-
-            try
-            {
-                //送信が有効かどうかチェック
-                if (!enableSend)
-                {
-                    return;
-                }
-
-                lock (syncObj)
-                {
-                    if (flgReqTakePic)
-                    {
-                        flgReqTakePic = false;
-                    }
-                    else
-                    {
-                        return;
-                    }
-
-                }
-
-
-                //データを読み取り
-                Camera.Parameters parameters = camera.GetParameters();
-                Camera.Size size = parameters.PreviewSize;
-                using (Android.Graphics.YuvImage image = new Android.Graphics.YuvImage(data, parameters.PreviewFormat,
-                        size.Width, size.Height, null))
-                {
-
-
-                    //データをJPGに変換してメモリに保持                    
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        image.CompressToJpeg(
-                            new Android.Graphics.Rect(0, 0, image.Width, image.Height), 90,
-                            ms);
-
-                        ms.Close();
-                        PicData pd = new PicData(ms.ToArray(), DateTime.Now); // Closeしてからでないと、ToArrayは正常に取得できない
-                        dataManager.PicDataQueue.Enqueue(pd);
-                    }
-
-
-                }
-
-
-            }
-            catch (Exception e)
-            {
-                showError(e);
-            }
-
-        }
-        #endregion
-
-
-        #region IPictureCallback メンバー
-
-        public void OnPictureTaken(byte[] data, Camera camera)
-        {
-
-
-            try
-            {
-
-                PicData pd = new PicData(data, DateTime.Now);
-                dataManager.PicDataQueue.Enqueue(pd);
-
-
-            }
-            catch (Exception e)
-            {
-                showError(e);
-            }
-
-            lock (cameraSyncObj)
-            {
-                camera.StartPreview();
-            }
-            ApplyFlashStatus();
-        }
-
-        #endregion
     }
 }
 

@@ -9,7 +9,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-[assembly: Android.Runtime.ResourceDesignerAttribute("AutoSendPic.Resource", IsApplication=true)]
+[assembly: global::Android.Runtime.ResourceDesignerAttribute("AutoSendPic.Resource", IsApplication=true)]
 
 namespace AutoSendPic
 {
@@ -19,9 +19,9 @@ namespace AutoSendPic
 	public partial class Resource
 	{
 		
-		Resource()
+		static Resource()
 		{
-			global::Android.Runtime.ResourceIdManager.UpdateIdValues ();
+			global::Android.Runtime.ResourceIdManager.UpdateIdValues();
 		}
 		
 		public static void UpdateIdValues()
@@ -30,6 +30,11 @@ namespace AutoSendPic
 		
 		public partial class Attribute
 		{
+			
+			static Attribute()
+			{
+				global::Android.Runtime.ResourceIdManager.UpdateIdValues();
+			}
 			
 			private Attribute()
 			{
@@ -41,6 +46,11 @@ namespace AutoSendPic
 			
 			// aapt resource value: 0x7f020000
 			public const int Icon = 2130837504;
+			
+			static Drawable()
+			{
+				global::Android.Runtime.ResourceIdManager.UpdateIdValues();
+			}
 			
 			private Drawable()
 			{
@@ -68,6 +78,11 @@ namespace AutoSendPic
 			// aapt resource value: 0x7f060005
 			public const int surfaceView1 = 2131099653;
 			
+			static Id()
+			{
+				global::Android.Runtime.ResourceIdManager.UpdateIdValues();
+			}
+			
 			private Id()
 			{
 			}
@@ -78,6 +93,11 @@ namespace AutoSendPic
 			
 			// aapt resource value: 0x7f030000
 			public const int Main = 2130903040;
+			
+			static Layout()
+			{
+				global::Android.Runtime.ResourceIdManager.UpdateIdValues();
+			}
 			
 			private Layout()
 			{
@@ -105,6 +125,11 @@ namespace AutoSendPic
 			// aapt resource value: 0x7f050004
 			public const int pref_send_url_title = 2131034116;
 			
+			static String()
+			{
+				global::Android.Runtime.ResourceIdManager.UpdateIdValues();
+			}
+			
 			private String()
 			{
 			}
@@ -115,6 +140,11 @@ namespace AutoSendPic
 			
 			// aapt resource value: 0x7f040000
 			public const int preference = 2130968576;
+			
+			static Xml()
+			{
+				global::Android.Runtime.ResourceIdManager.UpdateIdValues();
+			}
 			
 			private Xml()
 			{
