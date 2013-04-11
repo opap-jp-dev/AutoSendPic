@@ -6,20 +6,49 @@
     android:title="Width"
     android:summary="Width"
     android:inputType="number"
-   	android:defaultValue="1280"/>
-  
-  <EditTextPreference
-   android:key="Height"
-   android:title="Height"
-   android:summary="Height"
-   android:inputType="number"
-   android:defaultValue="720"/>
+    android:defaultValue="1280"/>
 
   <EditTextPreference
-   android:key="MinInterval"
-   android:title="MinInterval"
-   android:summary="MinInterval"
-   android:inputType="number"
-   android:defaultValue="1"/>
+    android:key="Height"
+    android:title="Height"
+    android:summary="Height"
+    android:inputType="number"
+    android:defaultValue="720"/>
+
+  <EditTextPreference
+    android:key="MinInterval"
+    android:title="MinInterval"
+    android:summary="MinInterval"
+    android:inputType="number"
+    android:defaultValue="10"/>
+
+  <CheckBoxPreference
+    android:key="UseHttp"
+    android:title="UseHttp"
+    android:summary="UseHttp"
+    android:defaultValue="true" />
   
+  <EditTextPreference
+    android:key="HttpUrl"
+    android:title="HttpUrl"
+    android:summary="HttpUrl"
+    android:defaultValue=""/>
+
+  <EditTextPreference
+    android:key="HttpUser"
+    android:title="HttpUser"
+    android:summary="HttpUser"
+    android:defaultValue=""/>
+
+  <EditTextPreference
+    android:key="HttpPass"
+    android:title="HttpPass"
+    android:summary="HttpPass"
+    android:defaultValue=""/>
+  
+  <CheckBoxPreference
+    android:key="BeepOnError"
+    android:title="BeepOnError"
+    android:summary="BeepOnError"
+    android:defaultValue="true" />
 </PreferenceScreen>

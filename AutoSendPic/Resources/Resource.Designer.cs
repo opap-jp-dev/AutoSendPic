@@ -72,11 +72,17 @@ namespace AutoSendPic
 			// aapt resource value: 0x7f060002
 			public const int btnToggleFlash = 2131099650;
 			
+			// aapt resource value: 0x7f060005
+			public const int frameLayout1 = 2131099653;
+			
 			// aapt resource value: 0x7f060000
 			public const int linearLayout1 = 2131099648;
 			
-			// aapt resource value: 0x7f060005
-			public const int surfaceView1 = 2131099653;
+			// aapt resource value: 0x7f060006
+			public const int surfaceView1 = 2131099654;
+			
+			// aapt resource value: 0x7f060007
+			public const int tvOKCount = 2131099655;
 			
 			static Id()
 			{
@@ -116,14 +122,11 @@ namespace AutoSendPic
 			// aapt resource value: 0x7f050002
 			public const int main_btnFocus_text = 2131034114;
 			
-			// aapt resource value: 0x7f050003
-			public const int pref_send_url_key = 2131034115;
-			
-			// aapt resource value: 0x7f050005
-			public const int pref_send_url_summary = 2131034117;
-			
 			// aapt resource value: 0x7f050004
-			public const int pref_send_url_title = 2131034116;
+			public const int pref_send_url_summary = 2131034116;
+			
+			// aapt resource value: 0x7f050003
+			public const int pref_send_url_title = 2131034115;
 			
 			static String()
 			{

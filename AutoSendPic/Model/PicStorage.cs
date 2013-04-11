@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Threading.Tasks;
 
 using Android.App;
 using Android.Content;
@@ -17,14 +18,23 @@ namespace AutoSendPic.Model
     {
         public string FileNameFormat { get; set; }
 
-        public abstract bool Save(PicData dataToSave);
+        public abstract Task<bool> Save(PicData dataToSave);
 
 
-        public string MakeFileName()
+        public string MakeFileName(DateTime timestamp)
         {
-            string fileName = string.Format(FileNameFormat, DateTime.Now);
+            string fileName = string.Format(FileNameFormat, timestamp);
             return fileName;
         }
+        
+        public void OnError(Exception ex)
+        {
+            if (Error != null)
+            {
+                Error(this, new ExceptionEventArgs(ex));
+            }
+        }
 
+        public event EventHandler<ExceptionEventArgs> Error;
     }
 }

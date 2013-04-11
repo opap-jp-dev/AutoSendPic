@@ -1,6 +1,5 @@
 *.user
 *.suo
-
+*.userprefs
 /AutoSendPic/obj
-
-/AutoSendPic/bin
+/AutoSendPic/bin/Debug

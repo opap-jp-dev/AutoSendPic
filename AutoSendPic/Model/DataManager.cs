@@ -37,21 +37,22 @@ namespace AutoSendPic.Model
         }
 
         /// <summary>
-        /// 
+        /// データを保存します
         /// </summary>
         /// <param name="dataToSave"></param>
         /// <returns></returns>
-        public bool Save(PicData dataToSave)
+        public async void Save(PicData dataToSave)
         {
-
+            bool flgOK = true;
             foreach (var stor in PicStorages)
             {
                 try
                 {
-                    stor.Save(dataToSave);
+                    flgOK &= await stor.Save(dataToSave);
                 }
                 catch (Exception ex)
                 {
+                    flgOK = false;
                     if (ex is ThreadAbortException)
                     {
                         throw;
@@ -62,8 +63,10 @@ namespace AutoSendPic.Model
                     }
                 }
             }
-
-            return true;
+            if (flgOK)
+            {
+                OnSuccess();
+            }
         }
 		/// <summary>
 		/// 	非同期アップロードを開始する
@@ -108,6 +111,14 @@ namespace AutoSendPic.Model
             }
         }
 
+		public void OnSuccess(){
+			if ( Success != null){
+			
+				Success(this, EventArgs.Empty);
+			}
+		}
+
+		public event EventHandler Success;
 
         public void OnError(Exception ex)
         {

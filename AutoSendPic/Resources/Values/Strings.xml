@@ -3,7 +3,7 @@
   <string name="Hello">Hello World, Click Me!</string>
   <string name="ApplicationName">AutoSendPic</string>
   <string name="main_btnFocus_text">フォーカス</string>
-  <string name="pref_send_url_key">SendUrl</string>
+  
   <string name="pref_send_url_title">送信先URL</string>
   <string name="pref_send_url_summary">送信先URL</string>
 </resources>

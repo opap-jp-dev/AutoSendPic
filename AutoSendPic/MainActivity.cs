@@ -15,6 +15,8 @@ using Android.Widget;
 using Android.OS;
 using Android.Hardware;
 using Android.OS.Storage;
+using Android.Media;
+
 using AutoSendPic.Model;
 
 namespace AutoSendPic
@@ -36,46 +38,51 @@ namespace AutoSendPic
         /// <summary>
         /// カメラへの参照
         /// </summary>
-        //private Camera camera;
+        private CameraManager cameraManager;
 
 
         /// <summary>
         /// 送信用オブジェクト
         /// </summary>
-        private DataManager dataManager;
+        private volatile DataManager dataManager;
 
         /// <summary>
         /// カメラ操作同期用オブジェクト
         /// </summary>
-        private object cameraSyncObj = new object();
-        /// <summary>
-        /// カメラ操作同期用オブジェクト
-        /// </summary>
-        private object timerSyncObj = new object();
+        private volatile object timerSyncObj = new object();
 
         /// <summary>
         /// 汎用同期用オブジェクト
         /// </summary>
-        private object syncObj = new object();
+        private volatile object syncObj = new object();
         /// <summary>
         /// タイマー
         /// </summary>
-        private Timer mainTimer;
+        private volatile Timer mainTimer;
 
         /// <summary>
         /// 設定
         /// </summary>
-        private Settings settings;
+        private volatile Settings settings;
 
         /// <summary>
         /// カメラ表示の初期の幅
         /// </summary>
-        private int originalWidth;
+        private volatile int originalWidth;
 
         /// <summary>
         /// カメラ表示の初期の高さ
         /// </summary>
-        private int originalHeight;
+        private volatile int originalHeight;
+
+        /// <summary>
+        /// 成功カウント
+        /// </summary>
+        private volatile int okCount = 0;
+        /// <summary>
+        /// 
+        /// </summary>
+        private volatile Handler handler = new Handler();
 
         #region Activityイベント
         /// <summary>
@@ -97,6 +104,11 @@ namespace AutoSendPic
             //設定読み込み
             settings = Settings.Load(this);
 
+            //カメラを開く
+            cameraManager = new CameraManager();
+            cameraManager.PictureTaken += CameraManager_PictureTaken;
+            cameraManager.Open();
+
             // カメラ表示設定
             cameraSurfaceView = FindViewById<SurfaceView>(Resource.Id.surfaceView1);
             cameraSurfaceView.Holder.AddCallback(this);
@@ -104,15 +116,21 @@ namespace AutoSendPic
             // 各種イベントを登録する
             SetupEvents();
 
-            //カメラを開く
-            CameraManager.Instance.Open();
-            CameraManager.Instance.PictureTaken += CameraManager_PictureTaken;
-
         }
 
         void CameraManager_PictureTaken(object sender, DataEventArgs e)
         {
-            dataManager.PicDataQueue.Enqueue(e.Data);
+            try
+            {
+                lock (syncObj)
+                {
+                    this.dataManager.PicDataQueue.Enqueue(e.Data);
+                }
+            }
+            catch (Exception ex)
+            {
+                showError(ex);
+            }
         }
 
         public override bool OnCreateOptionsMenu(IMenu menu)
@@ -146,31 +164,54 @@ namespace AutoSendPic
             return true;
 
         }
-
-        public override void OnConfigurationChanged(Android.Content.Res.Configuration newConfig)
-        {
-            base.OnConfigurationChanged(newConfig);
-
-            Android.Util.Log.Debug("AutoSendPic", "Configuration Changed");
-        }
+        
         protected override void OnPause()
         {
             base.OnPause();
-            StopSend();
-            CameraManager.Instance.Close();
+            try
+            {
+                StopSend();
+                ApplySendStatus();
+                cameraManager.Close();
+            }
+            catch (Exception e)
+            {
+                showError(e);
+            }
         }
+
         protected override void OnResume()
         {
             base.OnResume();
-            CameraManager.Instance.Open();
+            try
+            {
+                cameraManager.Open();
+
+            }
+            catch (Exception e)
+            {
+                showError(e);
+            }
         }
+
         protected override void OnDestroy()
         {
             base.OnDestroy();
+            try
+            {
+                StopTimer();
+                StopDataManager();
+                cameraManager.Error -= HandleError;
+                cameraManager.PictureTaken -= CameraManager_PictureTaken;
+                cameraManager.Close();
+                cameraManager.Dispose();
+                cameraManager = null;
 
-            StopTimer();
-            StopDataManager();
-            CameraManager.Instance.Close();
+            }
+            catch (Exception e)
+            {
+                showError(e);
+            }
         }
         #endregion
 
@@ -180,13 +221,16 @@ namespace AutoSendPic
         void SetupEvents()
         {
 
+            //カメラ関連
+            cameraManager.Error += HandleError;
 
 
             //ボタン設定
-            Button btnSendStart = FindViewById<Button>(Resource.Id.btnSendStart);
+            ToggleButton btnSendStart = FindViewById<ToggleButton>(Resource.Id.btnSendStart);
             btnSendStart.Click += delegate
             {
-                ToggleSendStatus();
+                enableSend = btnSendStart.Checked;
+                ApplySendStatus();
             };
 
 
@@ -202,7 +246,7 @@ namespace AutoSendPic
             {
                 try
                 {
-                    CameraManager.Instance.AutoFocus();
+                    cameraManager.AutoFocus();
                 }
                 catch (Exception ex)
                 {
@@ -210,11 +254,11 @@ namespace AutoSendPic
                 }
             };
 
-            Button btnToggleFlash = FindViewById<Button>(Resource.Id.btnToggleFlash);
+            ToggleButton btnToggleFlash = FindViewById<ToggleButton>(Resource.Id.btnToggleFlash);
             btnToggleFlash.Click += delegate
             {
-                CameraManager.Instance.EnableFlash = !CameraManager.Instance.EnableFlash;
-                CameraManager.Instance.ApplyFlashStatus();
+                cameraManager.EnableFlash = btnToggleFlash.Checked;
+                cameraManager.ApplyFlashStatus();
             };
         }
 
@@ -254,10 +298,24 @@ namespace AutoSendPic
             lock (syncObj)
             {
                 // 送信モジュールを初期化
-                dataManager = new DataManager();
-                dataManager.PicStorages.Add(new LocalFilePicStorage() { OutputDir = settings.OutputDir, FileNameFormat = "pic_{0:yyyy-MM-dd-HH-mm-ss}.jpg" });
-                dataManager.Error += dataManager_Error;
-
+                const string FileNameFormat = "pic_{0:yyyy-MM-dd-HH-mm-ss}.jpg";
+                this.dataManager = new DataManager();
+                //ストレージモジュールの設定
+                dataManager.PicStorages.Add(new LocalFilePicStorage() { OutputDir = settings.OutputDir, FileNameFormat = FileNameFormat });
+                if (settings.UseHttp)
+                {
+                    dataManager.PicStorages.Add(new HttpPicStorage()
+                    {
+                        Url = settings.HttpUrl,
+                        Credentials = new System.Net.NetworkCredential(settings.HttpUser, settings.HttpPass),
+                        FileNameFormat = FileNameFormat
+                    });
+                }
+                //イベントの設定
+                dataManager.Error += HandleError;
+                dataManager.Success += HandleSuccess;
+                //開始
+                okCount = 0;
                 dataManager.Start();
             }
         }
@@ -268,11 +326,28 @@ namespace AutoSendPic
             {
                 if (dataManager != null)
                 {
+                    dataManager.Error -= HandleError;
+                    dataManager.Success -= HandleSuccess;
                     dataManager.Stop();
                     dataManager.Dispose();
                     dataManager = null;
                 }
             }
+        }
+
+        void HandleError(object sender, ExceptionEventArgs e)
+        {
+            showError(e.Exception);
+        }
+
+        void HandleSuccess(object sender, EventArgs e)
+        {
+            okCount++;
+            handler.Post(() =>
+            {
+                TextView tvOKCount = FindViewById<TextView>(Resource.Id.tvOKCount);
+                tvOKCount.Text = string.Format("OK Count: {0}", okCount);
+            });
         }
 
         void mainTimerCallback(object o)
@@ -285,7 +360,7 @@ namespace AutoSendPic
                     //送信が有効かどうかチェック
                     if (enableSend)
                     {
-                        CameraManager.Instance.RequestTakePicture();
+                        cameraManager.RequestTakePicture();
 
                     }
                 }
@@ -296,21 +371,15 @@ namespace AutoSendPic
             {
                 showError(e);
             }
-            finally
-            {
-            }
         }
 
-        void dataManager_Error(object sender, ExceptionEventArgs e)
-        {
-            showError(e.Exception);
-        }
 
         void showError(Exception ex)
         {
 
             try
             {
+
                 StringBuilder sb = new StringBuilder();
                 if (ex == null)
                 {
@@ -325,26 +394,50 @@ namespace AutoSendPic
                     );
                 }
 
-                Toast toast = Toast.MakeText(BaseContext, sb.ToString(), Android.Widget.ToastLength.Short);
-                toast.Show();
+                handler.Post(() =>
+                {
+                    try
+                    {
+                        Toast toast = Toast.MakeText(BaseContext, sb.ToString(), Android.Widget.ToastLength.Short);
+                        toast.Show();
+
+                        if (settings.BeepOnError)
+                        {
+
+                            using (ToneGenerator toneGenerator = new ToneGenerator(
+                                    Android.Media.Stream.System,
+                                    Android.Media.Volume.Max
+                                    ))
+                            {
+                                toneGenerator.StartTone(Android.Media.Tone.PropBeep);
+                            }
+                        }
+                    }
+                    catch
+                    {
+                    }
+                });
             }
             catch
             {
             }
         }
 
-
-        public void ToggleSendStatus()
+        public void ApplySendStatus()
         {
-
             if (enableSend)
-            {
-                StopSend();
-            }
-            else
             {
                 StartSend();
             }
+            else
+            {
+                StopSend();
+            }
+            handler.Post(() =>
+            {
+                ToggleButton btnSendStart = FindViewById<ToggleButton>(Resource.Id.btnSendStart);
+                btnSendStart.Checked = enableSend;
+            });
         }
 
         public void StartSend()
@@ -356,27 +449,17 @@ namespace AutoSendPic
             ApplyCammeraSettings();
 
             //スタート
-            StartTimer();
             StartDataManager();
+            StartTimer();
             enableSend = true;
-            RefreshUIStatus();
         }
 
         public void StopSend()
         {
             //ストップ
-            StopDataManager();
             StopTimer();
+            StopDataManager();
             enableSend = false;
-            RefreshUIStatus();
-        }
-
-        public void RefreshUIStatus()
-        {
-
-            //画面設定
-            Button btnSendStart = FindViewById<Button>(Resource.Id.btnSendStart);
-            btnSendStart.Text = enableSend ? "送信停止" : "送信開始";
         }
 
         public void ApplyCammeraSettings()
@@ -388,32 +471,33 @@ namespace AutoSendPic
             }
 
 
-            CameraManager.Instance.Settings = this.settings;
-            CameraManager.Instance.ApplySettings();
+            cameraManager.Settings = this.settings;
+            cameraManager.ApplySettings();
 
 
 
-            Camera.Size sz = CameraManager.Instance.PictureSize;
+            Camera.Size sz = cameraManager.PictureSize;
 
 
 
             //レイアウト設定の編集
-
-            ViewGroup.LayoutParams lp = cameraSurfaceView.LayoutParameters;
-            int ch = sz.Height;
-            int cw = sz.Width;
-            if ((double)ch / cw > (double)originalWidth / originalHeight)
+            handler.Post(() =>
             {
-                lp.Width = originalWidth;
-                lp.Height = originalWidth * ch / cw;
-            }
-            else
-            {
-                lp.Width = originalHeight * cw / ch;
-                lp.Height = originalHeight;
-            }
-            cameraSurfaceView.LayoutParameters = lp;
-
+                ViewGroup.LayoutParams lp = cameraSurfaceView.LayoutParameters;
+                int ch = sz.Height;
+                int cw = sz.Width;
+                if ((double)ch / cw > (double)originalWidth / originalHeight)
+                {
+                    lp.Width = originalWidth;
+                    lp.Height = originalWidth * ch / cw;
+                }
+                else
+                {
+                    lp.Width = originalHeight * cw / ch;
+                    lp.Height = originalHeight;
+                }
+                cameraSurfaceView.LayoutParameters = lp;
+            });
         }
 
 
@@ -441,8 +525,8 @@ namespace AutoSendPic
 
 
                 // 画面プレビュー開始
-                CameraManager.Instance.SetPreviewDisplay(cameraSurfaceView.Holder);
-                CameraManager.Instance.StartPreview();
+                cameraManager.SetPreviewDisplay(cameraSurfaceView.Holder);
+                cameraManager.StartPreview();
 
             }
             catch (System.IO.IOException)
@@ -452,9 +536,9 @@ namespace AutoSendPic
 
         public void SurfaceCreated(ISurfaceHolder holder)
         {
-            if (!CameraManager.Instance.IsOpened)
+            if (!cameraManager.IsOpened)
             {
-                CameraManager.Instance.Open();
+                cameraManager.Open();
             }
         }
 

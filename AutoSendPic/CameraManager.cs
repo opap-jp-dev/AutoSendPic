@@ -21,25 +21,10 @@ namespace AutoSendPic
     /// <summary>
     /// カメラの制御等を行うクラス
     /// </summary>
-    public class CameraManager : Java.Lang.Object, Camera.IPictureCallback, Camera.IPreviewCallback
+    public class CameraManager : Java.Lang.Object, Camera.IPictureCallback, Camera.IPreviewCallback, IDisposable
     {
 
 
-        #region 静的メンバ
-
-
-        private static CameraManager _instance = new CameraManager();
-
-        /// <summary>
-        /// 唯一のインスタンスを取得します
-        /// </summary>
-        public static CameraManager Instance 
-        { 
-            get { return _instance; } 
-        }
-
-
-        #endregion
 
         #region 変数
 
@@ -62,23 +47,47 @@ namespace AutoSendPic
 
         #region プロパティ
 
+        /// <summary>
+        /// カメラ
+        /// </summary>
         private Camera MainCamera { get; set; }
+
+        /// <summary>
+        /// プレビュー出力先
+        /// </summary>
         private SurfaceView PreviewSurface { get; set; }
+
+        /// <summary>
+        /// 設定内容を取得または設定します
+        /// </summary>
         public Settings Settings { get; set; }
+
+        /// <summary>
+        /// カメラがオープンされているかどうかを取得します。
+        /// </summary>
         public bool IsOpened 
         { 
             get { return MainCamera != null; } 
         }
 
+        /// <summary>
+        /// カメラに設定されている画像サイズを取得します
+        /// </summary>
         public Camera.Size PictureSize
         {
             get { return MainCamera.GetParameters().PreviewSize; }
         }
 
+        /// <summary>
+        /// フラッシュの点灯状態を設定します。
+        /// </summary>
+        /// <remarks>
+        /// 設定を反映するためには、ApplyFlashStatusメソッドか、ApplySettingsメソッドを呼び出して下さい。
+        /// </remarks>
         public bool EnableFlash
         {
             get { return enableFlash; }
-            set { lock (syncObj) { enableFlash = value; } }
+            set { enableFlash = value;  }
         }
 
 
@@ -88,7 +97,7 @@ namespace AutoSendPic
         /// <summary>
         /// コンストラクタ
         /// </summary>
-        private CameraManager()
+        public CameraManager()
         {
 
         }
@@ -123,6 +132,9 @@ namespace AutoSendPic
                     return;
                 }
 
+                //この順序でクリーンアップしないとエラーが起きることがある
+                MainCamera.StopPreview();
+                MainCamera.SetPreviewCallback(null);
                 MainCamera.Release();
                 MainCamera.Dispose();
                 MainCamera = null;
@@ -245,6 +257,10 @@ namespace AutoSendPic
             }
         }
 
+        /// <summary>
+        /// 指定したパラメータオブジェクトにフラッシュの点灯状態を反映させます
+        /// </summary>
+        /// <param name="parameters">パラメータオブジェクト</param>
         private void SetFlashStatusToParam(Camera.Parameters parameters)
         {
             var modes = parameters.SupportedFlashModes;
@@ -315,6 +331,24 @@ namespace AutoSendPic
             }
         }
 
+
+        /// <summary>
+        /// エラーイベントを発生させる
+        /// </summary>
+        /// <param name="ex"></param>
+        public void OnError(Exception ex)
+        {
+            if (Error != null)
+            {
+                Error(this, new ExceptionEventArgs(ex));
+            }
+        }
+
+        /// <summary>
+        /// エラー発生時に発生する
+        /// </summary>
+        public event EventHandler<ExceptionEventArgs> Error;
+
         #endregion
 
         
@@ -330,7 +364,7 @@ namespace AutoSendPic
 
         #region IPreviewCallback メンバー
 
-        public void OnPreviewFrame(byte[] data, Camera camera)
+        public  void OnPreviewFrame(byte[] data, Camera camera)
         {
 
             lock (syncObj)
@@ -346,38 +380,59 @@ namespace AutoSendPic
 
             }
 
-
-            Task.Run(() =>
+            try
             {
-                //データを読み取り
-                Camera.Parameters parameters = camera.GetParameters();
-                Camera.Size size = parameters.PreviewSize;
-                using (Android.Graphics.YuvImage image = new Android.Graphics.YuvImage(data, parameters.PreviewFormat,
-                        size.Width, size.Height, null))
+
+                //JPEG圧縮を行うため、別スレッドで処理を行う
+                Task.Run(() =>
                 {
-
-
-                    //データをJPGに変換してメモリに保持                    
-                    using (MemoryStream ms = new MemoryStream())
+                    //データを読み取り
+                    Camera.Parameters parameters = camera.GetParameters();
+                    Camera.Size size = parameters.PreviewSize;
+                    using (Android.Graphics.YuvImage image = new Android.Graphics.YuvImage(data, parameters.PreviewFormat,
+                            size.Width, size.Height, null))
                     {
-                        image.CompressToJpeg(
-                            new Android.Graphics.Rect(0, 0, image.Width, image.Height), 90,
-                            ms);
 
-                        ms.Close(); // Closeしてからでないと、ToArrayは正常に取得できない
 
-                        byte[] jpegData = ms.ToArray();
-                        OnPictureTaken(new PicData(jpegData, DateTime.Now));
+                        //データをJPGに変換してメモリに保持                    
+                        using (MemoryStream ms = new MemoryStream())
+                        {
+                            image.CompressToJpeg(
+                                new Android.Graphics.Rect(0, 0, image.Width, image.Height), 90,
+                                ms);
+
+                            ms.Close(); // Closeしてからでないと、ToArrayは正常に取得できない
+
+                            byte[] jpegData = ms.ToArray();
+                            OnPictureTaken(new PicData(jpegData, DateTime.Now));
+
+                        }
+
 
                     }
-
-
-                }
-            });
+                });
+            }
+            catch (Exception ex)
+            {
+                OnError(ex);
+            }
         }
 
         #endregion
 
+
+
+        
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            try
+            {
+                Close();
+            }
+            catch { }
+        }
 
     }
 }

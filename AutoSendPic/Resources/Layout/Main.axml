@@ -15,24 +15,39 @@
             android:layout_width="wrap_content"
             android:layout_height="fill_parent"
             android:id="@+id/btnFocus" />
-        <Button
-            android:text="ライト"
+        <ToggleButton
             android:layout_width="wrap_content"
             android:layout_height="fill_parent"
-            android:id="@+id/btnToggleFlash" />
-        <Button
-            android:text="送信開始"
+            android:id="@+id/btnToggleFlash"
+            android:textOn="ライトON"
+            android:textOff="ライトOFF" />
+        <ToggleButton
             android:layout_width="wrap_content"
             android:layout_height="fill_parent"
-            android:id="@+id/btnSendStart" />
+            android:id="@+id/btnSendStart"
+            android:textOn="送信ON"
+            android:textOff="送信OFF" />
         <Button
             android:text="終了"
             android:layout_width="wrap_content"
             android:layout_height="fill_parent"
             android:id="@+id/btnExit" />
     </LinearLayout>
-    <SurfaceView
+    <RelativeLayout
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/surfaceView1" />
+        android:id="@+id/frameLayout1">
+        <SurfaceView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/surfaceView1" />
+        <TextView
+            android:text="OK Count: 0"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/tvOKCount"
+            android:layout_alignParentRight="true"
+            android:layout_marginTop="40dp"
+            android:layout_marginRight="40dp" />
+    </RelativeLayout>
 </LinearLayout>

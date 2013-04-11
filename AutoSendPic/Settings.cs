@@ -17,12 +17,15 @@ namespace AutoSendPic
 
         public string OutputDir { get; set; }
 
-        public string FtpUri { get; set; }
+        public bool UseHttp { get; set; }
 
-        public string FtpUser { get; set; }
+        public string HttpUrl { get; set; }
 
-        public string FtpPass { get; set; }
+        public string HttpUser { get; set; }
 
+        public string HttpPass { get; set; }
+
+        public bool BeepOnError { get; set; }
 
 
 
@@ -33,14 +36,15 @@ namespace AutoSendPic
             Settings s = new Settings();
             ISharedPreferences p = PreferenceManager.GetDefaultSharedPreferences(con);
 
-			s.MinInterval = int.Parse ( p.GetString ("MinInterval", "1"));
+			s.MinInterval = int.Parse ( p.GetString ("MinInterval", "10"));
 			s.Width = int.Parse ( p.GetString("Width", "1280"));
 			s.Height = int.Parse ( p.GetString("Height", "720"));
             s.OutputDir = p.GetString("OutputDir", Android.OS.Environment.ExternalStorageDirectory + "/AutoSendPic/");
-            s.FtpUri = p.GetString("FtpUri", "");
-            s.FtpUser = p.GetString("FtpUser", "");
-            s.FtpPass = p.GetString("FtpPass", "");
-                      
+            s.UseHttp = p.GetBoolean("UseHttp", true);
+			s.HttpUrl = p.GetString("HttpUrl", "");
+			s.HttpUser = p.GetString("HttpUser", "");
+			s.HttpPass = p.GetString("HttpPass", "");
+            s.BeepOnError = p.GetBoolean("BeepOnError", true);
 
             return s;
         }

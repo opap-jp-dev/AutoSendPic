@@ -16,7 +16,7 @@ namespace AutoSendPic.Model
             set;
         }
 
-        public override bool Save(PicData dataToSave)
+        public override async Task<bool> Save(PicData dataToSave)
         {
             //出力ファイル名の決定
             string fileDir = OutputDir;
@@ -24,7 +24,7 @@ namespace AutoSendPic.Model
             {
                 fileDir += Path.DirectorySeparatorChar;
             }
-            string filePath = fileDir + MakeFileName();
+            string filePath = fileDir + MakeFileName(dataToSave.TimeStamp);
 
             //保存先がなければ作る
             if (!Directory.Exists(fileDir))
@@ -32,11 +32,14 @@ namespace AutoSendPic.Model
                 Directory.CreateDirectory(fileDir);
             }
 
-            //保存処理
-            using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            await Task.Run(() =>
             {
-                fs.Write(dataToSave.Data, 0, dataToSave.Data.Length);
-            }
+                //保存処理
+                using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                {
+                    fs.Write(dataToSave.Data, 0, dataToSave.Data.Length);
+                }
+            });
 
             return true;
 

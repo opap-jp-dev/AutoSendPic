@@ -55,6 +55,8 @@
     <Compile Include="Model\PicData.cs" />
     <Compile Include="Model\PicStorage.cs" />
     <Compile Include="Model\LocalFilePicStorage.cs" />
+    <Compile Include="Model\HttpPicStorage.cs" />
+    <Compile Include="Model\TaskExt.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SettingsActivity.cs" />
     <Compile Include="MainActivity.cs" />
