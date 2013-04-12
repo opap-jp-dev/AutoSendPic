@@ -404,7 +404,7 @@ namespace AutoSendPic
                             ms.Close(); // Closeしてからでないと、ToArrayは正常に取得できない
 
                             byte[] jpegData = ms.ToArray();
-                            OnPictureTaken(new PicData(jpegData, DateTime.Now));
+                            OnPictureTaken(new PicData(jpegData, DateTime.Now, new LocationData()));
 
                         }
 

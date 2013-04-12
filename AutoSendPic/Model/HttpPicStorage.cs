@@ -54,22 +54,35 @@ namespace AutoSendPic.Model
         /// <returns></returns>
         private async Task<bool> SendHttp(PicData dataToSave)
         {
-
-            Dictionary<string, string> formValues = new Dictionary<string, string>();
-
-
-            using (MemoryStream ms = new MemoryStream(dataToSave.Data))
+            return await Task<bool>.Run(() =>
             {
-                HttpUploadFile(this.Url,
-                               this.Credentials, 
-                               MakeFileName(dataToSave.TimeStamp), 
-                               ms, 
-                               "file",
-                               "image/jpeg", 
-                               formValues);
-            }
-            await Task.Delay(1000);
-            return true;
+                //位置情報等
+                Dictionary<string, string> formValues = new Dictionary<string, string>();
+
+                formValues["Accuracy"] = dataToSave.Location.Accuracy.ToString();
+                formValues["Altitude"] = dataToSave.Location.Altitude.ToString();
+                formValues["Latitude"] = dataToSave.Location.Latitude.ToString();
+                formValues["Longitude"] = dataToSave.Location.Longitude.ToString();
+                formValues["Provider"] = dataToSave.Location.Provider;
+                formValues["Speed"] = dataToSave.Location.Speed.ToString();
+                formValues["Time"] = dataToSave.Location.Time.ToString();
+
+
+                //画像データを添付
+                using (MemoryStream ms = new MemoryStream(dataToSave.Data))
+                {
+
+                    bool sendOK = HttpUploadFile(this.Url,
+                                                 this.Credentials,
+                                                 MakeFileName(dataToSave.TimeStamp),
+                                                 ms,
+                                                 "file",
+                                                 "image/jpeg",
+                                                 formValues);
+
+                    return sendOK;
+                }
+            });
         }
 
         /// <summary>

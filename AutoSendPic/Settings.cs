@@ -36,14 +36,14 @@ namespace AutoSendPic
             Settings s = new Settings();
             ISharedPreferences p = PreferenceManager.GetDefaultSharedPreferences(con);
 
-			s.MinInterval = int.Parse ( p.GetString ("MinInterval", "10"));
-			s.Width = int.Parse ( p.GetString("Width", "1280"));
-			s.Height = int.Parse ( p.GetString("Height", "720"));
+            s.MinInterval = int.Parse(p.GetString("MinInterval", "10"));
+            s.Width = int.Parse(p.GetString("Width", "1280"));
+            s.Height = int.Parse(p.GetString("Height", "720"));
             s.OutputDir = p.GetString("OutputDir", Android.OS.Environment.ExternalStorageDirectory + "/AutoSendPic/");
             s.UseHttp = p.GetBoolean("UseHttp", true);
-			s.HttpUrl = p.GetString("HttpUrl", "");
-			s.HttpUser = p.GetString("HttpUser", "");
-			s.HttpPass = p.GetString("HttpPass", "");
+            s.HttpUrl = p.GetString("HttpUrl", "");
+            s.HttpUser = p.GetString("HttpUser", "");
+            s.HttpPass = p.GetString("HttpPass", "");
             s.BeepOnError = p.GetBoolean("BeepOnError", true);
 
             return s;

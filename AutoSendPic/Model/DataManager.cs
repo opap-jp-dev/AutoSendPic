@@ -36,6 +36,11 @@ namespace AutoSendPic.Model
             PicStorages = new List<PicStorage>(); //非スレッドセーフ
         }
 
+         ~DataManager()
+        {
+            Dispose(false);
+        }
+
         /// <summary>
         /// データを保存します
         /// </summary>
@@ -43,6 +48,7 @@ namespace AutoSendPic.Model
         /// <returns></returns>
         public async void Save(PicData dataToSave)
         {
+            bool exception = false;
             bool flgOK = true;
             foreach (var stor in PicStorages)
             {
@@ -61,11 +67,18 @@ namespace AutoSendPic.Model
                     {
                         OnError(ex);
                     }
+                    return;
                 }
             }
+
+            
             if (flgOK)
             {
                 OnSuccess();
+            }
+            else if(!exception)
+            {
+                OnError(new Exception("送信に失敗しました（原因不明）"));
             }
         }
 		/// <summary>
@@ -135,13 +148,17 @@ namespace AutoSendPic.Model
 
         public void Dispose()
         {
+            Dispose(true);
+        }
+
+        #endregion
+        protected virtual void Dispose(bool disposing)
+        {
             try
             {
                 Stop();
             }
             catch { }
         }
-
-        #endregion
     }
 }

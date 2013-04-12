@@ -8,9 +8,10 @@ namespace AutoSendPic.Model
     public class PicData
     {
         public DateTime TimeStamp { get; set; }
+        public LocationData Location { get; set; }
         public byte[] Data { get; set; }
 
-        public PicData(byte[] aData, DateTime aTimeStamp)
+        public PicData(byte[] aData, DateTime aTimeStamp, LocationData location)
         {
             this.Data = aData;
             this.TimeStamp = aTimeStamp;

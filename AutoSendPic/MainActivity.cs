@@ -29,6 +29,8 @@ namespace AutoSendPic
         /// </summary>
         SurfaceView cameraSurfaceView;
 
+        private PowerManager.WakeLock wakeLock = null;
+
         /// <summary>
         /// 送信中かどうかを格納するフラグ
         /// </summary>
@@ -40,6 +42,10 @@ namespace AutoSendPic
         /// </summary>
         private CameraManager cameraManager;
 
+        /// <summary>
+        /// 位置情報への参照
+        /// </summary>
+        private LocationTracker locTracker;
 
         /// <summary>
         /// 送信用オブジェクト
@@ -101,6 +107,13 @@ namespace AutoSendPic
             // 各種フラグ設定
             this.Window.AddFlags(WindowManagerFlags.KeepScreenOn);
 
+            //ウェイクロック
+            using (PowerManager pm = (PowerManager)GetSystemService(Service.PowerService))
+            {
+                wakeLock = pm.NewWakeLock(WakeLockFlags.ScreenDim, PackageName);
+                wakeLock.Acquire();       
+            }     
+
             //設定読み込み
             settings = Settings.Load(this);
 
@@ -113,6 +126,10 @@ namespace AutoSendPic
             cameraSurfaceView = FindViewById<SurfaceView>(Resource.Id.surfaceView1);
             cameraSurfaceView.Holder.AddCallback(this);
 
+            //位置情報を開く
+            locTracker = new LocationTracker(this);
+            locTracker.Start();
+
             // 各種イベントを登録する
             SetupEvents();
 
@@ -124,6 +141,7 @@ namespace AutoSendPic
             {
                 lock (syncObj)
                 {
+                    e.Data.Location = locTracker.LastLocation;
                     this.dataManager.PicDataQueue.Enqueue(e.Data);
                 }
             }
@@ -201,11 +219,21 @@ namespace AutoSendPic
             {
                 StopTimer();
                 StopDataManager();
-                cameraManager.Error -= HandleError;
-                cameraManager.PictureTaken -= CameraManager_PictureTaken;
-                cameraManager.Close();
-                cameraManager.Dispose();
-                cameraManager = null;
+                if (cameraManager != null)
+                {
+                    cameraManager.Error -= HandleError;
+                    cameraManager.PictureTaken -= CameraManager_PictureTaken;
+                    cameraManager.Close();
+                    cameraManager.Dispose();
+                    cameraManager = null;
+                }
+
+                if (wakeLock != null)
+                {
+                    wakeLock.Release();
+                    wakeLock.Dispose();
+                    wakeLock = null;
+                }
 
             }
             catch (Exception e)
