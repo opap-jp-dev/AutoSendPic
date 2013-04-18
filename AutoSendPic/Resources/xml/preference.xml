@@ -32,23 +32,31 @@
     android:key="HttpUrl"
     android:title="HttpUrl"
     android:summary="HttpUrl"
+    android:inputType="textUri"
     android:defaultValue=""/>
 
   <EditTextPreference
     android:key="HttpUser"
     android:title="HttpUser"
     android:summary="HttpUser"
+    android:inputType="textEmailAddress"
     android:defaultValue=""/>
 
   <EditTextPreference
     android:key="HttpPass"
     android:title="HttpPass"
-    android:summary="HttpPass"
+    android:inputType="textVisiblePassword"
     android:defaultValue=""/>
   
   <CheckBoxPreference
     android:key="BeepOnError"
     android:title="BeepOnError"
     android:summary="BeepOnError"
+    android:defaultValue="true" />
+  
+  <CheckBoxPreference
+    android:key="UsePreview"
+    android:title="UsePreview"
+    android:summary="UsePreview"
     android:defaultValue="true" />
 </PreferenceScreen>

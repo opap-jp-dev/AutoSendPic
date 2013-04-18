@@ -165,7 +165,6 @@ namespace AutoSendPic
                 {
                     return;
                 }
-                MainCamera.SetPreviewCallback(this);
                 MainCamera.StartPreview();
             }
         }
@@ -194,6 +193,7 @@ namespace AutoSendPic
         {
 
             Camera.Size sz;
+            Camera.Size sz2;
 
             if (!IsOpened)
             {
@@ -203,9 +203,9 @@ namespace AutoSendPic
             Camera.Parameters parameters = MainCamera.GetParameters();
             sz = GetOptimalSize(parameters.SupportedPreviewSizes, Settings.Width, Settings.Height); //最適なサイズを取得
             parameters.SetPreviewSize(sz.Width, sz.Height);
-            //sz2 = GetOptimalSize(parameters.SupportedPictureSizes, settings.Width, settings.Height);
-            //parameters.SetPictureSize(sz2.Width, sz2.Height);
-            //parameters.JpegQuality = 70;
+            sz2 = GetOptimalSize(parameters.SupportedPictureSizes, Settings.Width, Settings.Height);
+            parameters.SetPictureSize(sz2.Width, sz2.Height);
+            parameters.JpegQuality = 90;
 
             SetFlashStatusToParam(parameters);
 
@@ -214,6 +214,11 @@ namespace AutoSendPic
                 if (IsOpened)
                 {
                     MainCamera.SetParameters(parameters);
+                    MainCamera.SetPreviewCallback(null);
+                    if (Settings.UsePreview)
+                    {
+                        MainCamera.SetPreviewCallback(this);
+                    }
                 }
             }
 
@@ -224,9 +229,16 @@ namespace AutoSendPic
         /// </summary>
         public void RequestTakePicture()
         {
-            lock (syncObj)
+            if (Settings.UsePreview)
             {
-                flgReqTakePic = true;
+                lock (syncObj)
+                {
+                    flgReqTakePic = true;
+                }
+            }
+            else
+            {
+                MainCamera.TakePicture(null, null, this);
             }
         }
 
@@ -357,7 +369,19 @@ namespace AutoSendPic
 
         public void OnPictureTaken(byte[] data, Camera camera)
         {
-            //未実装
+            Task.Run(() =>
+                   {
+                       try
+                       {
+                           OnPictureTaken(new PicData(data, DateTime.Now, new LocationData()));
+                           StartPreview();
+                           ApplyFlashStatus();
+                       }
+                       catch (Exception ex)
+                       {
+                           OnError(ex);
+                       }
+                   });
         }
 
         #endregion
@@ -379,6 +403,7 @@ namespace AutoSendPic
                 }
 
             }
+
 
             try
             {

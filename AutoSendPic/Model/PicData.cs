@@ -16,6 +16,6 @@ namespace AutoSendPic.Model
             this.Data = aData;
             this.TimeStamp = aTimeStamp;
         }
-
+        
     }
 }

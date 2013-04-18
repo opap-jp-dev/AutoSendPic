@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace AutoSendPic.Model
 {
-    public class DataManager:IDisposable
+    public class DataManager : IDisposable
     {
         protected object lockPicStorages = new object();
 
@@ -36,7 +36,7 @@ namespace AutoSendPic.Model
             PicStorages = new List<PicStorage>(); //非スレッドセーフ
         }
 
-         ~DataManager()
+        ~DataManager()
         {
             Dispose(false);
         }
@@ -59,6 +59,7 @@ namespace AutoSendPic.Model
                 catch (Exception ex)
                 {
                     flgOK = false;
+                    exception = true;
                     if (ex is ThreadAbortException)
                     {
                         throw;
@@ -67,29 +68,28 @@ namespace AutoSendPic.Model
                     {
                         OnError(ex);
                     }
-                    return;
                 }
             }
 
-            
+
             if (flgOK)
             {
                 OnSuccess();
             }
-            else if(!exception)
+            else if (!exception)
             {
                 OnError(new Exception("送信に失敗しました（原因不明）"));
             }
         }
-		/// <summary>
-		/// 	非同期アップロードを開始する
-		/// </summary>
+        /// <summary>
+        /// 	非同期アップロードを開始する
+        /// </summary>
         public void Start()
         {
 
             if (thread != null && thread.ThreadState == ThreadState.Running)
             {
-                return; 
+                return;
             }
 
             thread = new Thread(() =>
@@ -97,14 +97,17 @@ namespace AutoSendPic.Model
                 for (; ; )
                 {
                     Thread.Sleep(100);
-                    
+
                     //１件処理する
                     PicData pd;
                     if (PicDataQueue.TryDequeue(out pd))
                     {
-                        Save(pd);
+                        Task.Run(() =>
+                        {
+                            Save(pd);
+                        });
                     }
-                    
+
                 }
 
             });
@@ -124,20 +127,22 @@ namespace AutoSendPic.Model
             }
         }
 
-		public void OnSuccess(){
-			if ( Success != null){
-			
-				Success(this, EventArgs.Empty);
-			}
-		}
+        public void OnSuccess()
+        {
+            if (Success != null)
+            {
 
-		public event EventHandler Success;
+                Success(this, EventArgs.Empty);
+            }
+        }
+
+        public event EventHandler Success;
 
         public void OnError(Exception ex)
         {
             if (Error != null)
             {
-                Error(this, new ExceptionEventArgs( ex));   
+                Error(this, new ExceptionEventArgs(ex));
             }
         }
 

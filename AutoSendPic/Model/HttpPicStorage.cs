@@ -42,7 +42,7 @@ namespace AutoSendPic.Model
         public override async Task<bool> Save(PicData dataToSave)
         {
             //保存処理
-            bool sendOK = await SendHttp(dataToSave).Timeout(TimeSpan.FromSeconds(Timeout));
+            bool sendOK = await SendHttp(dataToSave);
             return sendOK;
 
         }
@@ -54,35 +54,33 @@ namespace AutoSendPic.Model
         /// <returns></returns>
         private async Task<bool> SendHttp(PicData dataToSave)
         {
-            return await Task<bool>.Run(() =>
+            //位置情報等
+            Dictionary<string, string> formValues = new Dictionary<string, string>();
+
+            formValues["Accuracy"] = dataToSave.Location.Accuracy.ToString("G17");
+            formValues["Altitude"] = dataToSave.Location.Altitude.ToString("G17");
+            formValues["Latitude"] = dataToSave.Location.Latitude.ToString("G17");
+            formValues["Longitude"] = dataToSave.Location.Longitude.ToString("G17");
+            formValues["Provider"] = dataToSave.Location.Provider;
+            formValues["Speed"] = dataToSave.Location.Speed.ToString("G17");
+            formValues["Time"] = dataToSave.Location.Time.ToString();
+
+
+            //画像データを添付
+            using (MemoryStream ms = new MemoryStream(dataToSave.Data))
             {
-                //位置情報等
-                Dictionary<string, string> formValues = new Dictionary<string, string>();
 
-                formValues["Accuracy"] = dataToSave.Location.Accuracy.ToString();
-                formValues["Altitude"] = dataToSave.Location.Altitude.ToString();
-                formValues["Latitude"] = dataToSave.Location.Latitude.ToString();
-                formValues["Longitude"] = dataToSave.Location.Longitude.ToString();
-                formValues["Provider"] = dataToSave.Location.Provider;
-                formValues["Speed"] = dataToSave.Location.Speed.ToString();
-                formValues["Time"] = dataToSave.Location.Time.ToString();
+                bool sendOK = await HttpUploadFile(this.Url,
+                                             this.Credentials,
+                                             MakeFileName(dataToSave.TimeStamp),
+                                             ms,
+                                             "file",
+                                             "image/jpeg",
+                                             formValues,
+                                             TimeSpan.FromSeconds(this.Timeout));
 
-
-                //画像データを添付
-                using (MemoryStream ms = new MemoryStream(dataToSave.Data))
-                {
-
-                    bool sendOK = HttpUploadFile(this.Url,
-                                                 this.Credentials,
-                                                 MakeFileName(dataToSave.TimeStamp),
-                                                 ms,
-                                                 "file",
-                                                 "image/jpeg",
-                                                 formValues);
-
-                    return sendOK;
-                }
-            });
+                return sendOK;
+            }
         }
 
         /// <summary>
@@ -102,20 +100,22 @@ namespace AutoSendPic.Model
         ///     true: レスポンスが「200」だった場合
         ///     false: レスポンスが「200」以外だった場合
         /// </returns>
-        public static bool HttpUploadFile(string url, ICredentials credentials, string filename, Stream data,
-                                          string paramName, string contentType, Dictionary<string, string> formValues)
+        public static async Task<bool> HttpUploadFile(string url, ICredentials credentials, string filename, Stream data,
+                                          string paramName, string contentType, Dictionary<string, string> formValues, TimeSpan timeout)
         {
 
             string boundary = "---------------------------" + DateTime.Now.Ticks.ToString("x");
             byte[] boundarybytes = System.Text.Encoding.ASCII.GetBytes("\r\n--" + boundary + "\r\n");
 
-            HttpWebRequest wr = (HttpWebRequest)WebRequest.Create(url);
-            wr.ContentType = "multipart/form-data; boundary=" + boundary;
-            wr.Method = "POST";
-            wr.KeepAlive = true;
-            wr.Credentials = credentials;
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+            req.ContentType = "multipart/form-data; boundary=" + boundary;
+            req.Method = "POST";
+            req.KeepAlive = true;
+            req.Credentials = credentials;
+            req.PreAuthenticate = true;
+            req.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
             
-            using (Stream rs = wr.GetRequestStream())
+            using (Stream rs = req.GetRequestStream())
             {
                 // ファイル以外の値を送信
                 string formdataTemplate = "Content-Disposition: form-data; name=\"{0}\"\r\n\r\n{1}";
@@ -147,14 +147,31 @@ namespace AutoSendPic.Model
             }
 
             //レスポンスの取得
-            using (HttpWebResponse wresp = (HttpWebResponse)wr.GetResponse())
+            HttpWebResponse res = null;
+            try
             {
-                if (wresp.StatusCode != HttpStatusCode.OK)
+                res = (HttpWebResponse)await req.GetResponseAsync().Timeout(timeout);
+
+                if (res.StatusCode != HttpStatusCode.OK)
                 {
                     return false;
                 }
             }
-
+            catch
+            {
+                req.Abort();
+                throw;
+            }
+            finally
+            {
+                if (res != null)
+                {
+                    res.Dispose();
+                    res = null;
+                }
+            }
+            
+           
             return true;
         }
 

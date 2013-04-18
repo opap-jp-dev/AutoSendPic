@@ -16,6 +16,7 @@ using Android.OS;
 using Android.Hardware;
 using Android.OS.Storage;
 using Android.Media;
+using Android.Locations;
 
 using AutoSendPic.Model;
 
@@ -45,7 +46,12 @@ namespace AutoSendPic
         /// <summary>
         /// 位置情報への参照
         /// </summary>
-        private LocationTracker locTracker;
+        private LocationTracker locTrackerGPS;
+
+        /// <summary>
+        /// 位置情報への参照
+        /// </summary>
+        private LocationTracker locTrackerNetwork;
 
         /// <summary>
         /// 送信用オブジェクト
@@ -127,8 +133,10 @@ namespace AutoSendPic
             cameraSurfaceView.Holder.AddCallback(this);
 
             //位置情報を開く
-            locTracker = new LocationTracker(this);
-            locTracker.Start();
+            locTrackerGPS = new LocationTracker(this, LocationManager.GpsProvider);
+            locTrackerGPS.Start();
+            locTrackerNetwork = new LocationTracker(this, LocationManager.NetworkProvider);
+            locTrackerNetwork.Start();
 
             // 各種イベントを登録する
             SetupEvents();
@@ -139,11 +147,42 @@ namespace AutoSendPic
         {
             try
             {
+                //2つの位置情報を取得する
+                LocationData gps = locTrackerGPS.LastLocation;
+                LocationData net = locTrackerNetwork.LastLocation;
+
+                //どちらの位置情報を使うか決定する
+
+                LocationData lastLocation = gps;//基本はGPS使用
+                if (gps.Time.AddMinutes(1) < net.Time) 
+                {
+                    lastLocation = net;//NetがGPSよりも1分以上新しい→Net
+                }
+                if (gps.Accuracy - net.Accuracy > 30) 
+                {
+                    lastLocation = net;//Netの方がGPSよりも30m以上精度が高い→Net
+                }
+
+
                 lock (syncObj)
                 {
-                    e.Data.Location = locTracker.LastLocation;
+                    e.Data.Location = lastLocation;
                     this.dataManager.PicDataQueue.Enqueue(e.Data);
                 }
+
+                //画面に位置情報を出す
+                handler.Post(() =>
+                {
+                    try
+                    {
+                        TextView tvLocation = FindViewById<TextView>(Resource.Id.tvLocation);
+                        tvLocation.Text = string.Format("Loc: {0}, {1} ({2})",
+                                                        lastLocation.Latitude,
+                                                        lastLocation.Longitude,
+                                                        lastLocation.Provider);
+                    }
+                    catch { }
+                });
             }
             catch (Exception ex)
             {
@@ -235,6 +274,15 @@ namespace AutoSendPic
                     wakeLock = null;
                 }
 
+                //if (locTrackerGPS != null)
+                //{
+                //    locTrackerGPS.Dispose();
+                //}
+
+                //if (locTrackerNetwork != null)
+                //{
+                //    locTrackerNetwork.Dispose();
+                //}
             }
             catch (Exception e)
             {
@@ -373,8 +421,12 @@ namespace AutoSendPic
             okCount++;
             handler.Post(() =>
             {
-                TextView tvOKCount = FindViewById<TextView>(Resource.Id.tvOKCount);
-                tvOKCount.Text = string.Format("OK Count: {0}", okCount);
+                try
+                {
+                    TextView tvOKCount = FindViewById<TextView>(Resource.Id.tvOKCount);
+                    tvOKCount.Text = string.Format("OK Count: {0}", okCount);
+                }
+                catch { }
             });
         }
 
@@ -463,8 +515,12 @@ namespace AutoSendPic
             }
             handler.Post(() =>
             {
-                ToggleButton btnSendStart = FindViewById<ToggleButton>(Resource.Id.btnSendStart);
-                btnSendStart.Checked = enableSend;
+                try
+                {
+                    ToggleButton btnSendStart = FindViewById<ToggleButton>(Resource.Id.btnSendStart);
+                    btnSendStart.Checked = enableSend;
+                }
+                catch { }
             });
         }
 
@@ -511,20 +567,24 @@ namespace AutoSendPic
             //レイアウト設定の編集
             handler.Post(() =>
             {
-                ViewGroup.LayoutParams lp = cameraSurfaceView.LayoutParameters;
-                int ch = sz.Height;
-                int cw = sz.Width;
-                if ((double)ch / cw > (double)originalWidth / originalHeight)
+                try
                 {
-                    lp.Width = originalWidth;
-                    lp.Height = originalWidth * ch / cw;
+                    ViewGroup.LayoutParams lp = cameraSurfaceView.LayoutParameters;
+                    int ch = sz.Height;
+                    int cw = sz.Width;
+                    if ((double)ch / cw > (double)originalWidth / originalHeight)
+                    {
+                        lp.Width = originalWidth;
+                        lp.Height = originalWidth * ch / cw;
+                    }
+                    else
+                    {
+                        lp.Width = originalHeight * cw / ch;
+                        lp.Height = originalHeight;
+                    }
+                    cameraSurfaceView.LayoutParameters = lp;
                 }
-                else
-                {
-                    lp.Width = originalHeight * cw / ch;
-                    lp.Height = originalHeight;
-                }
-                cameraSurfaceView.LayoutParameters = lp;
+                catch { }
             });
         }
 

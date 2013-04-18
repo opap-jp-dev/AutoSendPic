@@ -81,6 +81,9 @@ namespace AutoSendPic
 			// aapt resource value: 0x7f060006
 			public const int surfaceView1 = 2131099654;
 			
+			// aapt resource value: 0x7f060008
+			public const int tvLocation = 2131099656;
+			
 			// aapt resource value: 0x7f060007
 			public const int tvOKCount = 2131099655;
 			
