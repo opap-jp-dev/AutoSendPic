@@ -143,6 +143,9 @@ namespace AutoSendPic
         /// </summary>
         public void OnLocationChanged(Location location)
         {
+            //UNIX時刻
+            DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
             LastLocation = new LocationData()
             {
                 Provider = location.Provider,
@@ -151,7 +154,7 @@ namespace AutoSendPic
                 Latitude = location.Latitude,
                 Longitude = location.Longitude,
                 Speed = location.Speed,
-                Time = new DateTime(location.Time)
+                Time = UnixEpoch.AddMilliseconds(location.Time).ToLocalTime()
             };
         }
 

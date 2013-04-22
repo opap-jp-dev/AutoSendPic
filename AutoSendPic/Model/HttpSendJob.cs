@@ -65,6 +65,7 @@ namespace AutoSendPic.Model
             formValues["Provider"] = dataToSend.Location.Provider;
             formValues["Speed"] = dataToSend.Location.Speed.ToString("G17");
             formValues["Time"] = dataToSend.Location.Time.ToString();
+            formValues["TimeStamp"] = dataToSend.TimeStamp.ToString("yyyy/MM/dd HH:mm:ss");
 
 
             //画像データを添付

@@ -60,7 +60,7 @@ namespace AutoSendPic.Model
                     using (StreamWriter sw = new StreamWriter(fs))
                     {
                         LocationData loc = DataToSend.Location;
-                        sw.WriteLine("{0:yyyy/MM/dd HH:mm:ss},{1},{2},{3},{4},{5},{6},{7},{0:yyyy/MM/dd HH:mm:ss}",
+                        sw.WriteLine("{0:yyyy/MM/dd HH:mm:ss},{1},{2},{3},{4},{5},{6},{7},{8:HH:mm:ss}",
                                     DataToSend.TimeStamp,
                                     fileName,
                                     loc.Provider,
