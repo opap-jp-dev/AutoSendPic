@@ -5,10 +5,12 @@ using System.Net;
 using System.Text;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Runtime;
 using Android.Views;
 using Android.Widget;
@@ -22,7 +24,10 @@ using AutoSendPic.Model;
 
 namespace AutoSendPic
 {
-    [Activity(Label = "AutoSendPic", MainLauncher = true, Icon = "@drawable/icon")]
+    [Activity(Label = "AutoSendPic", MainLauncher = true, Icon = "@drawable/icon",
+        ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.Keyboard
+            | ConfigChanges.KeyboardHidden | ConfigChanges.ScreenLayout | ConfigChanges.UiMode,
+        ScreenOrientation = ScreenOrientation.Landscape)]
     public class MainActivity : Activity, ISurfaceHolderCallback
     {
         /// <summary>
@@ -56,7 +61,7 @@ namespace AutoSendPic
         /// <summary>
         /// 送信用オブジェクト
         /// </summary>
-        private volatile DataManager dataManager;
+        private volatile SendJobManager sendJobManager;
 
         /// <summary>
         /// カメラ操作同期用オブジェクト
@@ -90,7 +95,26 @@ namespace AutoSendPic
         /// <summary>
         /// 成功カウント
         /// </summary>
-        private volatile int okCount = 0;
+        private volatile int okCountHttp = 0;
+        /// <summary>
+        /// 成功カウント
+        /// </summary>
+        private volatile int okCountLocal = 0;
+
+        /// <summary>
+        /// 合計カウント
+        /// </summary>
+        private volatile int totalCountHttp = 0;
+        /// <summary>
+        /// 合計カウント
+        /// </summary>
+        private volatile int totalCountLocal = 0;
+
+        /// <summary>
+        /// 最後に測位した位置
+        /// </summary>
+        private LocationData lastLocation;
+
         /// <summary>
         /// 
         /// </summary>
@@ -117,8 +141,8 @@ namespace AutoSendPic
             using (PowerManager pm = (PowerManager)GetSystemService(Service.PowerService))
             {
                 wakeLock = pm.NewWakeLock(WakeLockFlags.ScreenDim, PackageName);
-                wakeLock.Acquire();       
-            }     
+                wakeLock.Acquire();
+            }
 
             //設定読み込み
             settings = Settings.Load(this);
@@ -131,6 +155,7 @@ namespace AutoSendPic
             // カメラ表示設定
             cameraSurfaceView = FindViewById<SurfaceView>(Resource.Id.surfaceView1);
             cameraSurfaceView.Holder.AddCallback(this);
+            cameraSurfaceView.Holder.SetType(SurfaceType.PushBuffers);
 
             //位置情報を開く
             locTrackerGPS = new LocationTracker(this, LocationManager.GpsProvider);
@@ -140,6 +165,12 @@ namespace AutoSendPic
 
             // 各種イベントを登録する
             SetupEvents();
+
+        }
+
+        public override void OnConfigurationChanged(Android.Content.Res.Configuration newConfig)
+        {
+            base.OnConfigurationChanged(newConfig);
 
         }
 
@@ -153,33 +184,55 @@ namespace AutoSendPic
 
                 //どちらの位置情報を使うか決定する
 
-                LocationData lastLocation = gps;//基本はGPS使用
-                if (gps.Time.AddMinutes(1) < net.Time) 
+                LocationData _lastLocation = gps;//基本はGPS使用
+                if (gps.Time.AddMinutes(1) < net.Time)
                 {
-                    lastLocation = net;//NetがGPSよりも1分以上新しい→Net
+                    _lastLocation = net;//NetがGPSよりも1分以上新しい→Net
                 }
-                if (gps.Accuracy - net.Accuracy > 30) 
+                if (gps.Accuracy - net.Accuracy > 30)
                 {
-                    lastLocation = net;//Netの方がGPSよりも30m以上精度が高い→Net
+                    _lastLocation = net;//Netの方がGPSよりも30m以上精度が高い→Net
+                }
+
+                this.lastLocation = _lastLocation;
+                e.Data.Location = _lastLocation;
+
+
+                /*** 送信ジョブを作成 ***/
+
+                const string FileNameFormat = "pic_{0:yyyy-MM-dd-HH-mm-ss}.jpg";
+                DateTime expire = DateTime.Now.AddSeconds(settings.MinInterval * 3); //3倍の時間が掛かったら期限切れにする
+
+                //ローカル
+                sendJobManager.JobQueue.Enqueue(new LocalSendJob(e.Data, expire)
+                {
+                    OutputDir = settings.OutputDir,
+                    FileNameFormat = FileNameFormat
+                });
+                totalCountLocal++;
+
+                //HTTP
+                if (settings.UseHttp)
+                {
+                    sendJobManager.JobQueue.Enqueue(new HttpSendJob(e.Data, expire)
+                    {
+                        Url = settings.HttpUrl,
+                        Credentials = new System.Net.NetworkCredential(settings.HttpUser, settings.HttpPass),
+                        FileNameFormat = FileNameFormat,
+                        Timeout = 5 + (uint)settings.MinInterval * 2
+                    });
+                    totalCountHttp++;
                 }
 
 
-                lock (syncObj)
-                {
-                    e.Data.Location = lastLocation;
-                    this.dataManager.PicDataQueue.Enqueue(e.Data);
-                }
+
 
                 //画面に位置情報を出す
                 handler.Post(() =>
                 {
                     try
                     {
-                        TextView tvLocation = FindViewById<TextView>(Resource.Id.tvLocation);
-                        tvLocation.Text = string.Format("Loc: {0}, {1} ({2})",
-                                                        lastLocation.Latitude,
-                                                        lastLocation.Longitude,
-                                                        lastLocation.Provider);
+                        RefreshUI();
                     }
                     catch { }
                 });
@@ -201,7 +254,10 @@ namespace AutoSendPic
             menuItem1.SetIcon(Android.Resource.Drawable.IcMenuPreferences);
 
             //アクションバーに表示            
-            menuItem1.SetShowAsAction(ShowAsAction.Always);
+            if (Build.VERSION.SdkInt >= BuildVersionCodes.Honeycomb)
+            {
+                menuItem1.SetShowAsAction(ShowAsAction.Always);
+            }
             return true;
         }
 
@@ -221,7 +277,7 @@ namespace AutoSendPic
             return true;
 
         }
-        
+
         protected override void OnPause()
         {
             base.OnPause();
@@ -373,26 +429,17 @@ namespace AutoSendPic
             StopDataManager();
             lock (syncObj)
             {
-                // 送信モジュールを初期化
-                const string FileNameFormat = "pic_{0:yyyy-MM-dd-HH-mm-ss}.jpg";
-                this.dataManager = new DataManager();
-                //ストレージモジュールの設定
-                dataManager.PicStorages.Add(new LocalFilePicStorage() { OutputDir = settings.OutputDir, FileNameFormat = FileNameFormat });
-                if (settings.UseHttp)
-                {
-                    dataManager.PicStorages.Add(new HttpPicStorage()
-                    {
-                        Url = settings.HttpUrl,
-                        Credentials = new System.Net.NetworkCredential(settings.HttpUser, settings.HttpPass),
-                        FileNameFormat = FileNameFormat
-                    });
-                }
+                this.sendJobManager = new SendJobManager();
                 //イベントの設定
-                dataManager.Error += HandleError;
-                dataManager.Success += HandleSuccess;
+                sendJobManager.Error += HandleError;
+                sendJobManager.Success += HandleSuccess;
                 //開始
-                okCount = 0;
-                dataManager.Start();
+                okCountHttp = 0;
+                okCountLocal = 0;
+                totalCountHttp = 0;
+                totalCountLocal = 0;
+
+                sendJobManager.Start();
             }
         }
 
@@ -400,13 +447,13 @@ namespace AutoSendPic
         {
             lock (syncObj)
             {
-                if (dataManager != null)
+                if (sendJobManager != null)
                 {
-                    dataManager.Error -= HandleError;
-                    dataManager.Success -= HandleSuccess;
-                    dataManager.Stop();
-                    dataManager.Dispose();
-                    dataManager = null;
+                    sendJobManager.Error -= HandleError;
+                    sendJobManager.Success -= HandleSuccess;
+                    sendJobManager.Stop();
+                    sendJobManager.Dispose();
+                    sendJobManager = null;
                 }
             }
         }
@@ -414,21 +461,22 @@ namespace AutoSendPic
         void HandleError(object sender, ExceptionEventArgs e)
         {
             showError(e.Exception);
+            RefreshUI();
         }
 
-        void HandleSuccess(object sender, EventArgs e)
+        void HandleSuccess(object sender, JobEventArgs e)
         {
-            okCount++;
-            handler.Post(() =>
+            if (e.Job is HttpSendJob)
             {
-                try
-                {
-                    TextView tvOKCount = FindViewById<TextView>(Resource.Id.tvOKCount);
-                    tvOKCount.Text = string.Format("OK Count: {0}", okCount);
-                }
-                catch { }
-            });
+                okCountHttp++;
+            }
+            else if (e.Job is LocalSendJob)
+            {
+                okCountLocal++;
+            }
+            RefreshUI();
         }
+
 
         void mainTimerCallback(object o)
         {
@@ -546,7 +594,7 @@ namespace AutoSendPic
             enableSend = false;
         }
 
-        public void ApplyCammeraSettings()
+        public void ApplyCammeraSettings(bool startPreview = true)
         {
 
             if (originalHeight * originalWidth == 0)
@@ -570,19 +618,51 @@ namespace AutoSendPic
                 try
                 {
                     ViewGroup.LayoutParams lp = cameraSurfaceView.LayoutParameters;
-                    int ch = sz.Height;
-                    int cw = sz.Width;
-                    if ((double)ch / cw > (double)originalWidth / originalHeight)
-                    {
-                        lp.Width = originalWidth;
-                        lp.Height = originalWidth * ch / cw;
-                    }
-                    else
-                    {
-                        lp.Width = originalHeight * cw / ch;
-                        lp.Height = originalHeight;
-                    }
+
+
+                    double ch = sz.Height;
+                    double cw = sz.Width;
+
+                    double w_scale = (double)originalWidth / sz.Width;
+                    double h_scale = (double)originalHeight / sz.Height ;
+                   
+                    double scale = Math.Min(w_scale, h_scale);
+                    lp.Width = (int)(sz.Width * scale);
+                    lp.Height = (int)(sz.Height * scale);
+                    
                     cameraSurfaceView.LayoutParameters = lp;
+                    cameraSurfaceView.Holder.SetFixedSize(lp.Width, lp.Height);
+
+                    //プレビュー開始
+                    cameraManager.StartPreview();
+
+                }
+                catch (Exception ex)
+                {
+                    showError(ex);
+                }
+            });
+        }
+
+        public void RefreshUI()
+        {
+
+            handler.Post(() =>
+            {
+                try
+                {
+                    TextView tvLocation = FindViewById<TextView>(Resource.Id.tvLocation);
+                    tvLocation.Text = string.Format("Loc: {0}, {1} ({2})",
+                                                    lastLocation.Latitude,
+                                                    lastLocation.Longitude,
+                                                    lastLocation.Provider);
+
+                    TextView tvOKCount = FindViewById<TextView>(Resource.Id.tvOKCount);
+                    tvOKCount.Text = string.Format("OK Count: [Local] {0}/{1} [HTTP] {2}/{3}",
+                            okCountLocal,
+                            totalCountLocal,
+                            okCountHttp,
+                            totalCountHttp);
                 }
                 catch { }
             });
@@ -597,6 +677,9 @@ namespace AutoSendPic
 
             try
             {
+                holder.SetType(SurfaceType.PushBuffers);
+                
+
                 // 縦横が入れ替わっている場合の対処
                 if (width < height)
                 {
@@ -605,16 +688,16 @@ namespace AutoSendPic
                     height = t;
                 }
 
-                originalWidth = width;
-                originalHeight = height;
+                if (originalHeight * originalWidth == 0)
+                {
+                    originalWidth = width;
+                    originalHeight = height;
+                }
+
 
                 // カメラ設定の編集
                 ApplyCammeraSettings();
 
-
-                // 画面プレビュー開始
-                cameraManager.SetPreviewDisplay(cameraSurfaceView.Holder);
-                cameraManager.StartPreview();
 
             }
             catch (System.IO.IOException)
@@ -628,11 +711,17 @@ namespace AutoSendPic
             {
                 cameraManager.Open();
             }
+            cameraManager.SetPreviewDisplay(cameraSurfaceView.Holder);
+
         }
 
         public void SurfaceDestroyed(ISurfaceHolder holder)
         {
-
+            if (cameraManager != null)
+            {
+                cameraManager.StopPreview();
+                cameraManager.SetPreviewDisplay(null);
+            }
         }
 
         #endregion

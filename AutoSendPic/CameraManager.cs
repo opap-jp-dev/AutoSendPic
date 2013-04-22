@@ -150,7 +150,13 @@ namespace AutoSendPic
         {
             lock (syncObj)
             {
+
+                if (!IsOpened)
+                {
+                    return;
+                }
                 MainCamera.SetPreviewDisplay(holder);
+
             }
         }
 
@@ -165,7 +171,14 @@ namespace AutoSendPic
                 {
                     return;
                 }
-                MainCamera.StartPreview();
+                try
+                {
+                    MainCamera.StartPreview();
+                }
+                catch (Exception ex)
+                {
+                    OnError(ex);
+                }
             }
         }
 
@@ -199,12 +212,14 @@ namespace AutoSendPic
             {
                 return;
             }
+            StopPreview();
 
             Camera.Parameters parameters = MainCamera.GetParameters();
             sz = GetOptimalSize(parameters.SupportedPreviewSizes, Settings.Width, Settings.Height); //最適なサイズを取得
             parameters.SetPreviewSize(sz.Width, sz.Height);
-            sz2 = GetOptimalSize(parameters.SupportedPictureSizes, Settings.Width, Settings.Height);
+            sz2 = GetOptimalSize(parameters.SupportedPictureSizes, sz.Width, sz.Height);
             parameters.SetPictureSize(sz2.Width, sz2.Height);
+            parameters.PictureFormat = Android.Graphics.ImageFormatType.Jpeg;
             parameters.JpegQuality = 90;
 
             SetFlashStatusToParam(parameters);
@@ -276,8 +291,11 @@ namespace AutoSendPic
         private void SetFlashStatusToParam(Camera.Parameters parameters)
         {
             var modes = parameters.SupportedFlashModes;
-
-            if (enableFlash)
+			if (modes == null)
+			{
+				return;
+			}
+            else if (enableFlash)
             {
                 if (modes.Contains(Camera.Parameters.FlashModeTorch))
                 {

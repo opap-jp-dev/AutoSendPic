@@ -38,11 +38,11 @@
       android:layout_height="wrap_content"
       android:id="@+id/frameLayout1">
     <SurfaceView
-        android:layout_width="fill_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/surfaceView1" />
     <TextView
-        android:text="OK Count: 0"
+        android:text="OK Count: [Local] 0/0 [HTTP] 0/0"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:id="@+id/tvOKCount"
@@ -56,7 +56,7 @@
         android:layout_height="wrap_content"
         android:id="@+id/tvLocation"
         android:layout_alignParentRight="true"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="30dp"
         android:layout_marginRight="10dp"
         android:gravity="right" />
   </RelativeLayout>

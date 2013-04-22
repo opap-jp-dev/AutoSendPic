@@ -6,14 +6,14 @@
     android:title="Width"
     android:summary="Width"
     android:inputType="number"
-    android:defaultValue="1280"/>
+    android:defaultValue="640"/>
 
   <EditTextPreference
     android:key="Height"
     android:title="Height"
     android:summary="Height"
     android:inputType="number"
-    android:defaultValue="720"/>
+    android:defaultValue="480"/>
 
   <EditTextPreference
     android:key="MinInterval"

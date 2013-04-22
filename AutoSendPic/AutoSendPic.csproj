@@ -41,8 +41,6 @@
     <AndroidUseSharedRuntime>False</AndroidUseSharedRuntime>
     <EmbedAssembliesIntoApk>True</EmbedAssembliesIntoApk>
     <AndroidLinkSkip />
-    <AndroidLinkMode>Full</AndroidLinkMode>
-    <BundleAssemblies>False</BundleAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Mono.Android" />
@@ -56,14 +54,15 @@
     <Compile Include="CameraManager.cs" />
     <Compile Include="LocationTracker.cs" />
     <Compile Include="Model\DataEventArgs.cs" />
-    <Compile Include="Model\DataManager.cs" />
+    <Compile Include="Model\SendJobManager.cs" />
     <Compile Include="Model\ExceptionEventArgs.cs" />
     <Compile Include="Model\LocationData.cs" />
     <Compile Include="Model\PicData.cs" />
-    <Compile Include="Model\PicStorage.cs" />
-    <Compile Include="Model\LocalFilePicStorage.cs" />
-    <Compile Include="Model\HttpPicStorage.cs" />
+    <Compile Include="Model\DataSendJob.cs" />
+    <Compile Include="Model\LocalSendJob.cs" />
+    <Compile Include="Model\HttpSendJob.cs" />
     <Compile Include="Model\TaskExt.cs" />
+    <Compile Include="Model\JobEventArgs.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SettingsActivity.cs" />
     <Compile Include="MainActivity.cs" />
@@ -101,4 +100,17 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <ProjectExtensions>
+    <MonoDevelop>
+      <Properties>
+        <Policies>
+          <TextStylePolicy inheritsSet="VisualStudio" inheritsScope="text/plain" scope="text/x-csharp" />
+          <CSharpFormattingPolicy IndentSwitchBody="True" AnonymousMethodBraceStyle="NextLine" PropertyBraceStyle="NextLine" PropertyGetBraceStyle="NextLine" PropertySetBraceStyle="NextLine" EventBraceStyle="NextLine" EventAddBraceStyle="NextLine" EventRemoveBraceStyle="NextLine" StatementBraceStyle="NextLine" ArrayInitializerBraceStyle="NextLine" BeforeMethodDeclarationParentheses="False" BeforeMethodCallParentheses="False" BeforeConstructorDeclarationParentheses="False" BeforeDelegateDeclarationParentheses="False" NewParentheses="False" SpacesBeforeBrackets="False" inheritsSet="Mono" inheritsScope="text/x-csharp" scope="text/x-csharp" />
+          <TextStylePolicy FileWidth="120" TabsToSpaces="False" inheritsSet="VisualStudio" inheritsScope="text/plain" scope="text/plain" />
+          <TextStylePolicy inheritsSet="null" scope="application/xml" />
+          <XmlFormattingPolicy inheritsSet="Mono" inheritsScope="application/xml" scope="application/xml" />
+        </Policies>
+      </Properties>
+    </MonoDevelop>
+  </ProjectExtensions>
 </Project>
