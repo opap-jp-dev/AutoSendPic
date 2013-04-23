@@ -64,7 +64,7 @@ namespace AutoSendPic.Model
             formValues["Longitude"] = dataToSend.Location.Longitude.ToString("G17");
             formValues["Provider"] = dataToSend.Location.Provider;
             formValues["Speed"] = dataToSend.Location.Speed.ToString("G17");
-            formValues["Time"] = dataToSend.Location.Time.ToString();
+            formValues["Time"] = dataToSend.Location.Time.ToString("yyyy/MM/dd HH:mm:ss");
             formValues["TimeStamp"] = dataToSend.TimeStamp.ToString("yyyy/MM/dd HH:mm:ss");
 
 
