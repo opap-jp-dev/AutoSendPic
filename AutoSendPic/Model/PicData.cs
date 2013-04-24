@@ -11,10 +11,11 @@ namespace AutoSendPic.Model
         public LocationData Location { get; set; }
         public byte[] Data { get; set; }
 
-        public PicData(byte[] aData, DateTime aTimeStamp, LocationData location)
+        public PicData(byte[] data, DateTime timeStamp, LocationData location)
         {
-            this.Data = aData;
-            this.TimeStamp = aTimeStamp;
+            this.Data = data;
+            this.TimeStamp = timeStamp;
+            this.Location = location;
         }
         
     }

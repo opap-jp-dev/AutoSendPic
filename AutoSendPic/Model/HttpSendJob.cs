@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net;
 
@@ -10,6 +11,7 @@ namespace AutoSendPic.Model
 {
     public class HttpSendJob : DataSendJob
     {
+
         /// <summary>
         /// 送信先URL
         /// </summary>
@@ -40,10 +42,10 @@ namespace AutoSendPic.Model
             Timeout = 20;
         }
 
-        public override async Task<bool> Run()
+        public override bool Run()
         {
             //保存処理
-            bool sendOK = await SendHttp(DataToSend);
+            bool sendOK = SendHttp(DataToSend);
             return sendOK;
 
         }
@@ -53,7 +55,7 @@ namespace AutoSendPic.Model
         /// </summary>
         /// <param name="dataToSend"></param>
         /// <returns></returns>
-        private async Task<bool> SendHttp(PicData dataToSend)
+        private bool SendHttp(PicData dataToSend)
         {
             //位置情報等
             Dictionary<string, string> formValues = new Dictionary<string, string>();
@@ -72,7 +74,7 @@ namespace AutoSendPic.Model
             using (MemoryStream ms = new MemoryStream(dataToSend.Data))
             {
 
-                bool sendOK = await HttpUploadFile(this.Url,
+                bool sendOK =  HttpUploadFile(this.Url,
                                              this.Credentials,
                                              MakeFileName(dataToSend.TimeStamp),
                                              ms,
@@ -102,9 +104,11 @@ namespace AutoSendPic.Model
         ///     true: レスポンスが「200」だった場合
         ///     false: レスポンスが「200」以外だった場合
         /// </returns>
-        public static async Task<bool> HttpUploadFile(string url, ICredentials credentials, string filename, Stream data,
+        public static bool HttpUploadFile(string url, ICredentials credentials, string filename, Stream data,
                                           string paramName, string contentType, Dictionary<string, string> formValues, TimeSpan timeout)
         {
+            
+            ManualResetEvent allDone = new ManualResetEvent(false);
 
             string boundary = "---------------------------" + DateTime.Now.Ticks.ToString("x");
             byte[] boundarybytes = System.Text.Encoding.ASCII.GetBytes("\r\n--" + boundary + "\r\n");
@@ -150,30 +154,37 @@ namespace AutoSendPic.Model
             }
 
             //レスポンスの取得
-            HttpWebResponse res = null;
-            try
-            {
-                res = (HttpWebResponse)await req.GetResponseAsync().Timeout(timeout);
+            DateTime starttime = DateTime.Now;
 
+            var result = req.BeginGetResponse(ar =>
+            {
+                allDone.Set();
+            }, null);
+
+            bool flgTimedOut = false;
+            ThreadPool.RegisterWaitForSingleObject(result.AsyncWaitHandle, (state, timedout) =>
+            {
+                if (timedout)
+                {
+                    var _req = (WebRequest)state;
+                    if (_req != null) _req.Abort(); 
+                    flgTimedOut = true;
+                    allDone.Set();
+                }
+            }, req, timeout: timeout, executeOnlyOnce: true);
+
+            allDone.WaitOne();
+            if (flgTimedOut){
+                throw new TimeoutException();
+            }
+
+            using (HttpWebResponse res = (HttpWebResponse)req.EndGetResponse(result))
+            {
                 if (res.StatusCode != HttpStatusCode.OK)
                 {
                     return false;
                 }
             }
-            catch
-            {
-                req.Abort();
-                throw;
-            }
-            finally
-            {
-                if (res != null)
-                {
-                    res.Dispose();
-                    res = null;
-                }
-            }
-            
            
             return true;
         }

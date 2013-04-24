@@ -43,7 +43,7 @@ namespace AutoSendPic
         /// <summary>
         /// メインの位置情報プロバイダ
         /// </summary>
-        public string MainProvider { get; private set; }
+        public string Provider { get; private set; }
 
         /// <summary>
         /// 最後に測位した位置情報
@@ -66,22 +66,23 @@ namespace AutoSendPic
 
             if(locationMan.GetProviders(true).Contains(provider))
             {
-                MainProvider = provider;
+                Provider = provider;
             }
             else if (locationMan.IsProviderEnabled(LocationManager.GpsProvider))
             {
-                MainProvider = LocationManager.GpsProvider;
+                Provider = LocationManager.GpsProvider;
             }
             else if (locationMan.IsProviderEnabled(LocationManager.NetworkProvider))
             {
-                MainProvider = LocationManager.NetworkProvider;
+                Provider = LocationManager.NetworkProvider;
             }
             else
             {
                 Criteria crit = new Criteria();
                 crit.Accuracy = Accuracy.Fine;
-                MainProvider = locationMan.GetBestProvider(crit, true);
+                Provider = locationMan.GetBestProvider(crit, true);
             }
+
             LastGPSReceived = DateTime.MinValue;
 
         }
@@ -99,8 +100,12 @@ namespace AutoSendPic
         /// </summary>
         public void Start()
         {
-            locationMan.GetLastKnownLocation(MainProvider);
-            locationMan.RequestLocationUpdates(MainProvider, 1000, 1, this);
+            if (IsActive)
+            {
+                return;
+            }
+            locationMan.GetLastKnownLocation(Provider);
+            locationMan.RequestLocationUpdates(Provider, 1000, 1, this);
 
             IsActive = true;
         }
@@ -130,7 +135,11 @@ namespace AutoSendPic
                     Stop();
                 }
                 catch { }
-                locationMan.Dispose();
+                try
+                {
+                    locationMan.Dispose();
+                }
+                catch { }
                 locationMan = null;
             }
             base.Dispose(disposing);

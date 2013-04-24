@@ -40,12 +40,12 @@ namespace AutoSendPic.Model
         /// </summary>
         /// <param name="dataToSave"></param>
         /// <returns></returns>
-        public async void RunAJob(DataSendJob job)
+        public void RunAJob(DataSendJob job)
         {
             bool flgOK = false;
             try
             {
-                flgOK = await job.Run();
+                flgOK = job.Run();
                 if (flgOK)
                 {
                     OnSuccess(job);
@@ -71,7 +71,6 @@ namespace AutoSendPic.Model
                     ((IDisposable)job).Dispose();
                 }
             }
-
         }
         /// <summary>
         /// 	非同期アップロードを開始する
@@ -108,7 +107,7 @@ namespace AutoSendPic.Model
                     }
                     
                     //実行
-                    Task.Run(() =>
+                    TaskExt.Run(() =>
                     {
                         RunAJob(job);
                     });

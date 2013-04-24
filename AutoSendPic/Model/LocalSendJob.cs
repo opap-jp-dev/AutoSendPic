@@ -28,7 +28,7 @@ namespace AutoSendPic.Model
 
         }
 
-        public override async Task<bool> Run()
+        public override bool Run()
         {
             //出力ファイル名の決定
             string fileDir = OutputDir;
@@ -45,34 +45,31 @@ namespace AutoSendPic.Model
                 Directory.CreateDirectory(fileDir);
             }
 
-            await Task.Run(() =>
+            //保存処理
+            using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
             {
-                //保存処理
-                using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-                {
-                    fs.Write(DataToSend.Data, 0, DataToSend.Data.Length);
-                }
+                fs.Write(DataToSend.Data, 0, DataToSend.Data.Length);
+            }
 
-                //位置情報ログを保存
-                lock (logSyncObj) //ログ同時書き込み対策
+            //位置情報ログを保存
+            lock (logSyncObj) //ログ同時書き込み対策
+            {
+                using (FileStream fs = new FileStream(fileDir + LocationLogFileName, FileMode.Append, FileAccess.Write))
+                using (StreamWriter sw = new StreamWriter(fs))
                 {
-                    using (FileStream fs = new FileStream(fileDir + LocationLogFileName, FileMode.Append, FileAccess.Write))
-                    using (StreamWriter sw = new StreamWriter(fs))
-                    {
-                        LocationData loc = DataToSend.Location;
-                        sw.WriteLine("{0:yyyy/MM/dd HH:mm:ss},{1},{2},{3},{4},{5},{6},{7},{8:HH:mm:ss}",
-                                    DataToSend.TimeStamp,
-                                    fileName,
-                                    loc.Provider,
-                                    loc.Accuracy,
-                                    loc.Altitude,
-                                    loc.Latitude,
-                                    loc.Longitude,
-                                    loc.Speed,
-                                    loc.Time);
-                    }
+                    LocationData loc = DataToSend.Location;
+                    sw.WriteLine("{0:yyyy/MM/dd HH:mm:ss},{1},{2},{3},{4},{5},{6},{7},{8:HH:mm:ss}",
+                                DataToSend.TimeStamp,
+                                fileName,
+                                loc.Provider,
+                                loc.Accuracy,
+                                loc.Altitude,
+                                loc.Latitude,
+                                loc.Longitude,
+                                loc.Speed,
+                                loc.Time);
                 }
-            });
+            }
 
             return true;
 

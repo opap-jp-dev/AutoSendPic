@@ -200,7 +200,7 @@ namespace AutoSendPic
 
                 /*** 送信ジョブを作成 ***/
 
-                const string FileNameFormat = "pic_{0:yyyy-MM-dd-HH-mm-ss}.jpg";
+                const string FileNameFormat = "pic_{0:yyyyMMdd-HHmmss}.jpg";
                 DateTime expire = DateTime.Now.AddSeconds(settings.MinInterval * 3); //3倍の時間が掛かったら期限切れにする
 
                 //ローカル
@@ -330,15 +330,15 @@ namespace AutoSendPic
                     wakeLock = null;
                 }
 
-                //if (locTrackerGPS != null)
-                //{
-                //    locTrackerGPS.Dispose();
-                //}
+                if (locTrackerGPS != null)
+                {
+                    locTrackerGPS.Dispose();
+                }
 
-                //if (locTrackerNetwork != null)
-                //{
-                //    locTrackerNetwork.Dispose();
-                //}
+                if (locTrackerNetwork != null)
+                {
+                    locTrackerNetwork.Dispose();
+                }
             }
             catch (Exception e)
             {

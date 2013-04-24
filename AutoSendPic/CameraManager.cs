@@ -387,7 +387,7 @@ namespace AutoSendPic
 
         public void OnPictureTaken(byte[] data, Camera camera)
         {
-            Task.Run(() =>
+            TaskExt.Run(() =>
                    {
                        try
                        {
@@ -427,7 +427,7 @@ namespace AutoSendPic
             {
 
                 //JPEG圧縮を行うため、別スレッドで処理を行う
-                Task.Run(() =>
+                TaskExt.Run(() =>
                 {
                     //データを読み取り
                     Camera.Parameters parameters = camera.GetParameters();

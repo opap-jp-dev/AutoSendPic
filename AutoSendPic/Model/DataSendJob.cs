@@ -32,7 +32,7 @@ namespace AutoSendPic.Model
             this.Expire = expire;            
         }
         
-        public abstract Task<bool> Run();
+        public abstract bool Run();
 
 
         public string MakeFileName(DateTime timestamp)
